@@ -11,7 +11,7 @@ async function createThreadPuddle ({
   workerOptions = {},
   startupTimeout = 3000
 }) {
-  debug('Carving out a puddle...')
+  debug('carving out a puddle...')
 
   const workers = []
   const availableWorkers = []
@@ -28,12 +28,12 @@ async function createThreadPuddle ({
     availableWorkers.push(worker)
   }
 
-  debug('Filling puddle with thread liquid...')
+  debug('filling puddle with thread liquid...')
 
   for (let i = threadIdOffset; i < size + threadIdOffset; i += 1) {
     const id = i
 
-    debug('Creating worker thread %s', id)
+    debug('creating worker thread %s', id)
 
     const worker = new Worker(workerProxyPath, workerOptions)
     const { port1, port2 } = new MessageChannel()
@@ -45,9 +45,9 @@ async function createThreadPuddle ({
     })
 
     worker.on('error', (err) => {
-      debug(`Worker ${id} Error: %s`, err.message)
+      debug(`worker ${id} Error: %s`, err.message)
       if (!isTerminated) {
-        debug(`Restarting worker ${id} after uncaught error`)
+        debug(`restarting worker ${id} after uncaught error`)
         // TODO: If !isTerminated, spawn new worker
         // TODO: Count worker failures, after max failures, terminate pool
       }
@@ -149,15 +149,19 @@ async function createThreadPuddle ({
 
   debug('Puddle filled, happy splashing!')
 
-  return new Proxy({}, {
+  return new Proxy({
+    puddle: {
+      terminate
+    }
+  }, {
     get: (target, key) => {
       // If the proxy is returned from an async function,
       // the engine checks if it is a thenable by checking existence of a then method
       if (key === 'then') {
         return undefined
       }
-      if (key === 'terminate') {
-        return terminate
+      if (key === 'puddle') {
+        return target.puddle
       }
       return (...args) => new Promise((resolve, reject) => {
         getWorker().then(worker => callOnWorker(worker, key, args, resolve, reject))

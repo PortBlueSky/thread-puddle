@@ -7,5 +7,15 @@ module.exports = {
   fnWorkerNum (arg1) {
     return `got ${arg1} ${this.__ID__}`
   },
-  getWorkerData: () => workerData
+  getWorkerData: () => workerData,
+  triggerProcessError: () => {
+    const err = new Error('Worker failure')
+    process.emit('error', err)
+  },
+  triggerUncaughtException: () => {
+    setTimeout(() => {
+      const err = new Error('Worker failure')
+      process.emit('error', err)
+    }, 100)
+  }
 }

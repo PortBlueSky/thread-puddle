@@ -7,11 +7,11 @@ debug.enabled('puddle')
 
 const workerPath = path.resolve(__dirname, '../test/assets/test-worker.js')
 
-describe('Thread Pool', () => {
-  let pool = null
+describe('Thread puddle', () => {
+  let worker = null
 
   beforeEach(async () => {
-    pool = await createThreadPuddle({
+    worker = await createThreadPuddle({
       size: 2,
       workerPath,
       workerOptions: {
@@ -23,23 +23,23 @@ describe('Thread Pool', () => {
   })
 
   afterEach(() => {
-    pool.terminate()
+    worker.puddle.terminate()
   })
 
   it('can expose methods from worker module', async () => {
-    const value = await pool.fn('value')
+    const value = await worker.fn('value')
 
     expect(value).toEqual('got value')
   })
 
   it('can expose async methods from worker module', async () => {
-    const value = await pool.asyncFn('value')
+    const value = await worker.asyncFn('value')
 
     expect(value).toEqual('got async value')
   })
 
-  it('hands down workerData with workerOptions for pool', async () => {
-    const data = await pool.getWorkerData()
+  it('hands down workerData with workerOptions for worker', async () => {
+    const data = await worker.getWorkerData()
 
     expect(data).toEqual(expect.objectContaining({
       test: 'test worker data'
@@ -48,7 +48,7 @@ describe('Thread Pool', () => {
 
   it('throws error if method is not available on worker', async () => {
     try {
-      await pool.notWorkerMethod()
+      await worker.notWorkerMethod()
       expect(false).toBe(true)
     } catch (err) {
       expect(err).toHaveProperty('message', '"notWorkerMethod" is not a function in this worker thread')
@@ -56,10 +56,10 @@ describe('Thread Pool', () => {
   })
 
   it('calls methods round robin on workers', async () => {
-    const value1 = await pool.fnWorkerNum('value')
-    const value2 = await pool.fnWorkerNum('value')
-    const value3 = await pool.fnWorkerNum('value')
-    const value4 = await pool.fnWorkerNum('value')
+    const value1 = await worker.fnWorkerNum('value')
+    const value2 = await worker.fnWorkerNum('value')
+    const value3 = await worker.fnWorkerNum('value')
+    const value4 = await worker.fnWorkerNum('value')
 
     expect([value1, value2, value3, value4]).toEqual([
       'got value 9',
@@ -71,11 +71,28 @@ describe('Thread Pool', () => {
 
   it('forwards worker method errors with worker stack trace', async () => {
     try {
-      await pool.fnError('worker triggered this error message')
+      await worker.fnError('worker triggered this error message')
       expect(false).toBe(true)
     } catch (err) {
       expect(err).toHaveProperty('message', 'worker triggered this error message')
       expect(err).toHaveProperty('stack', expect.stringContaining('assets/test-worker.js'))
     }
   })
+
+  it('forwards worker process errors within method', async () => {
+    try {
+      await worker.triggerProcessError()
+      expect(false).toBe(true)
+    } catch (err) {
+      expect(err).toHaveProperty('message', 'Worker failure')
+      expect(err).toHaveProperty('stack', expect.stringContaining('assets/test-worker.js'))
+    }
+  })
+
+  it('handles uncaught exceptions in worker', async () => {
+    await worker.triggerUncaughtException()
+    await new Promise((resolve) => setTimeout(resolve, 150))
+  })
+
+  it.todo('throws before starting a worker which exposes reserved keys (like puddle)')
 })
