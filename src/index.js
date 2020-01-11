@@ -3,14 +3,16 @@ const { Worker, MessageChannel } = require('worker_threads')
 const debug = require('debug')('puddle:master')
 
 const workerProxyPath = path.resolve(__dirname, 'worker.js')
+let threadIdOffset = 1
 
 async function createThreadPuddle ({
   size = 1,
   workerPath,
   workerOptions = {},
-  startupTimeout = 3000,
-  logger = console
+  startupTimeout = 3000
 }) {
+  debug('Carving out a puddle...')
+
   const workers = []
   const availableWorkers = []
   const workerRequests = []
@@ -26,13 +28,19 @@ async function createThreadPuddle ({
     availableWorkers.push(worker)
   }
 
-  for (let i = 1; i <= size; i += 1) {
+  debug('Filling puddle with thread liquid...')
+
+  for (let i = threadIdOffset; i < size + threadIdOffset; i += 1) {
+    const id = i
+
+    debug('Creating worker thread %s', id)
+
     const worker = new Worker(workerProxyPath, workerOptions)
     const { port1, port2 } = new MessageChannel()
-    const id = i
     const workerWithChannel = { id, worker, port: port2 }
 
     worker.on('exit', (code) => {
+      debug('worker %d exited with code %d', id, code)
       // TODO: if all workes exited, terminate pool
     })
 
@@ -77,6 +85,8 @@ async function createThreadPuddle ({
     workers.push(workerWithChannel)
   }
 
+  threadIdOffset += size
+
   const callOnWorker = (worker, key, args, resolve, reject) => {
     const callbackId = callbackCount++
     workerCallbacks[callbackId] = { resolve, reject }
@@ -103,6 +113,8 @@ async function createThreadPuddle ({
   })
 
   const terminate = () => {
+    debug('Pulling the plug on the puddle...')
+
     isTerminated = true
     for (const pWorker of workers) {
       pWorker.worker.terminate()
@@ -116,11 +128,15 @@ async function createThreadPuddle ({
     }, startupTimeout)
     const workerRequest = {
       resolve: (worker) => {
+        debug('Worker %d ready', worker.id)
+
         clearTimeout(timeout)
         availableWorkers.push(worker)
         resolve()
       },
       reject: (err) => {
+        debug('Worker %d startup failed', worker.id)
+
         clearTimeout(timeout)
         terminate()
         reject(err)
@@ -130,6 +146,8 @@ async function createThreadPuddle ({
     workerRequests.push(workerRequest)
   })))
   availableWorkers.sort((a, b) => a.id < b.id ? -1 : 1)
+
+  debug('Puddle filled, happy splashing!')
 
   return new Proxy({}, {
     get: (target, key) => {

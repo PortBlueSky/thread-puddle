@@ -1,6 +1,9 @@
 /* eslint-env jest */
 const path = require('path')
 const { createThreadPuddle } = require('./index')
+const debug = require('debug')
+
+debug.enabled('puddle')
 
 const workerPath = path.resolve(__dirname, '../test/assets/test-worker.js')
 
@@ -48,7 +51,7 @@ describe('Thread Pool', () => {
       await pool.notWorkerMethod()
       expect(false).toBe(true)
     } catch (err) {
-      expect(err).toHaveProperty('message', '"notWorkerMethod" is not a function on any worker')
+      expect(err).toHaveProperty('message', '"notWorkerMethod" is not a function in this worker thread')
     }
   })
 
@@ -59,10 +62,10 @@ describe('Thread Pool', () => {
     const value4 = await pool.fnWorkerNum('value')
 
     expect([value1, value2, value3, value4]).toEqual([
-      'got value 1',
-      'got value 2',
-      'got value 1',
-      'got value 2'
+      'got value 9',
+      'got value 10',
+      'got value 9',
+      'got value 10'
     ])
   })
 
