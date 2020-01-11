@@ -28,19 +28,19 @@ async function createThreadPuddle ({
     availableWorkers.push(worker)
   }
 
-  debug('filling puddle with thread liquid...')
+  const removeWorker = ({ id }) => {
+    workers.splice(workers.findIndex(worker => (worker.id === id)), 1)
+    availableWorkers.splice(availableWorkers.findIndex(worker => (worker.id === id)), 1)
+  }
 
-  for (let i = threadIdOffset; i < size + threadIdOffset; i += 1) {
-    const id = i
-
-    debug('creating worker thread %s', id)
-
+  const createWorker = (id) => {
     const worker = new Worker(workerProxyPath, workerOptions)
     const { port1, port2 } = new MessageChannel()
     const workerWithChannel = { id, worker, port: port2 }
 
     worker.on('exit', (code) => {
       debug('worker %d exited with code %d', id, code)
+      removeWorker(workerWithChannel)
       // TODO: if all workes exited, terminate pool
     })
 
@@ -48,12 +48,12 @@ async function createThreadPuddle ({
       debug(`worker ${id} Error: %s`, err.message)
       if (!isTerminated) {
         debug(`restarting worker ${id} after uncaught error`)
-        // TODO: If !isTerminated, spawn new worker
+        createWorker(id)
         // TODO: Count worker failures, after max failures, terminate pool
       }
     })
 
-    worker.postMessage({ action: 'init', workerPath, port: port1, id: i }, [port1])
+    worker.postMessage({ action: 'init', workerPath, port: port1, id }, [port1])
     port2.on('message', (msg) => {
       switch (msg.action) {
         case 'resolve': {
@@ -83,6 +83,16 @@ async function createThreadPuddle ({
     })
 
     workers.push(workerWithChannel)
+  }
+
+  debug('filling puddle with thread liquid...')
+
+  for (let i = threadIdOffset; i < size + threadIdOffset; i += 1) {
+    const id = i
+
+    debug('creating worker thread %s', id)
+
+    createWorker(id)
   }
 
   threadIdOffset += size
@@ -149,10 +159,15 @@ async function createThreadPuddle ({
 
   debug('Puddle filled, happy splashing!')
 
+  const puddleInterface = {
+    terminate
+  }
+  Object.defineProperty(puddleInterface, 'size', {
+    get: () => workers.length
+  })
+
   return new Proxy({
-    puddle: {
-      terminate
-    }
+    puddle: puddleInterface
   }, {
     get: (target, key) => {
       // If the proxy is returned from an async function,

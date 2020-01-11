@@ -91,7 +91,9 @@ describe('Thread puddle', () => {
 
   it('handles uncaught exceptions in worker', async () => {
     await worker.triggerUncaughtException()
-    await new Promise((resolve) => setTimeout(resolve, 150))
+    await new Promise((resolve) => setTimeout(resolve, 500))
+
+    expect(worker.puddle).toHaveProperty('size', 2)
   })
 
   it.todo('throws before starting a worker which exposes reserved keys (like puddle)')
