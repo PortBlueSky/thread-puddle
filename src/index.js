@@ -3,7 +3,7 @@ const { Worker, MessageChannel } = require('worker_threads')
 
 const workerProxyPath = path.resolve(__dirname, 'worker.js')
 
-async function createWorkerPool ({ size = 1, workerPath }) {
+async function createWorkerPool ({ size = 1, workerPath, startupTimeout = 3000 }) {
   const workers = []
   const availableWorkers = []
   const workerRequests = []
@@ -23,6 +23,8 @@ async function createWorkerPool ({ size = 1, workerPath }) {
     const worker = new Worker(workerProxyPath)
     const { port1, port2 } = new MessageChannel()
     const workerWithChannel = { id: i, worker, port: port2 }
+
+    // TODO: Handle worker thread errors (restart worker if recoverable)
 
     worker.postMessage({ action: 'init', workerPath, port: port1, id: i }, [port1])
     port2.on('message', (msg) => {
@@ -92,7 +94,7 @@ async function createWorkerPool ({ size = 1, workerPath }) {
     const timeout = setTimeout(() => {
       terminate()
       reject(new Error(`Worker ${worker.id} initialization timed out`))
-    }, 3000)
+    }, startupTimeout)
     const workerRequest = {
       resolve: (worker) => {
         clearTimeout(timeout)
@@ -105,12 +107,15 @@ async function createWorkerPool ({ size = 1, workerPath }) {
         reject(err)
       }
     }
+
     workerRequests.push(workerRequest)
   })))
   availableWorkers.sort((a, b) => a.id < b.id ? -1 : 1)
 
   return new Proxy({}, {
     get: (target, key) => {
+      // If the proxy is returned from an async function,
+      // the engine checks if it is a thenable by checking existence of a then method
       if (key === 'then') {
         return undefined
       }

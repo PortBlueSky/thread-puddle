@@ -21,6 +21,12 @@ describe('Thread Pool', () => {
     expect(value).toEqual('got value')
   })
 
+  it('can expose async methods from worker module', async () => {
+    const value = await pool.asyncFn('value')
+
+    expect(value).toEqual('got async value')
+  })
+
   it('throws error if method is not available on worker', async () => {
     try {
       await pool.notWorkerMethod()
@@ -44,12 +50,13 @@ describe('Thread Pool', () => {
     ])
   })
 
-  it('forwards worker method errors with stack', async () => {
+  it('forwards worker method errors with worker stack trace', async () => {
     try {
       await pool.fnError('worker triggered this error message')
       expect(false).toBe(true)
     } catch (err) {
       expect(err).toHaveProperty('message', 'worker triggered this error message')
+      expect(err).toHaveProperty('stack', expect.stringContaining('assets/test-worker.js'))
     }
   })
 })
