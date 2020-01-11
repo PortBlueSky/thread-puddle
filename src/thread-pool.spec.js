@@ -7,8 +7,8 @@ const workerPath = path.resolve(__dirname, '../test/assets/test-worker.js')
 describe('Thread Pool', () => {
   let pool = null
 
-  beforeEach(() => {
-    pool = createWorkerPool({ size: 2, workerPath })
+  beforeEach(async () => {
+    pool = await createWorkerPool({ size: 2, workerPath })
   })
 
   afterEach(() => {
@@ -16,22 +16,27 @@ describe('Thread Pool', () => {
   })
 
   it('can expose methods from worker module', async () => {
-    const worker = await pool.getWorker()
-    const value = await worker.fn('value')
+    const value = await pool.fn('value')
 
     expect(value).toEqual('got value')
   })
 
-  it.skip('calls methods round robin on workers', async () => {
-    const worker = await pool.getWorker()
-    const values = await Promise.all([
-      worker.fnWorkerNum('value'),
-      worker.fnWorkerNum('value'),
-      worker.fnWorkerNum('value'),
-      worker.fnWorkerNum('value')
-    ])
+  it('throws error if method is not available on worker', async () => {
+    try {
+      await pool.notWorkerMethod()
+      expect(false).toBe(true)
+    } catch (err) {
+      expect(err).toHaveProperty('message', '"notWorkerMethod" is not a function on any worker')
+    }
+  })
 
-    expect(values).toEqual([
+  it('calls methods round robin on workers', async () => {
+    const value1 = await pool.fnWorkerNum('value')
+    const value2 = await pool.fnWorkerNum('value')
+    const value3 = await pool.fnWorkerNum('value')
+    const value4 = await pool.fnWorkerNum('value')
+
+    expect([value1, value2, value3, value4]).toEqual([
       'got value 1',
       'got value 2',
       'got value 1',
@@ -40,10 +45,8 @@ describe('Thread Pool', () => {
   })
 
   it('forwards worker method errors with stack', async () => {
-    const worker = await pool.getWorker()
-
     try {
-      await worker.fnError('worker triggered this error message')
+      await pool.fnError('worker triggered this error message')
       expect(false).toBe(true)
     } catch (err) {
       expect(err).toHaveProperty('message', 'worker triggered this error message')
