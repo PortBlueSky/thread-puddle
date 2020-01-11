@@ -1,9 +1,10 @@
 const path = require('path')
 const { Worker, MessageChannel } = require('worker_threads')
+const debug = require('debug')('puddle:master')
 
 const workerProxyPath = path.resolve(__dirname, 'worker.js')
 
-async function createWorkerPool ({
+async function createThreadPuddle ({
   size = 1,
   workerPath,
   workerOptions = {},
@@ -31,16 +32,17 @@ async function createWorkerPool ({
     const id = i
     const workerWithChannel = { id, worker, port: port2 }
 
-    // TODO: Handle worker thread errors (restart worker if recoverable)
     worker.on('exit', (code) => {
-      // TODO: If !isTerminated, spawn new worker
+      // TODO: if all workes exited, terminate pool
     })
 
     worker.on('error', (err) => {
-      logger.error(`Worker ${id} Error:`, err)
-      logger.debug(`Restarting worker ${id} after uncaught error`)
-      // TODO: If !isTerminated, spawn new worker
-      // TODO: Count worker failures, after max failures, terminate pool
+      debug(`Worker ${id} Error: %s`, err.message)
+      if (!isTerminated) {
+        debug(`Restarting worker ${id} after uncaught error`)
+        // TODO: If !isTerminated, spawn new worker
+        // TODO: Count worker failures, after max failures, terminate pool
+      }
     })
 
     worker.postMessage({ action: 'init', workerPath, port: port1, id: i }, [port1])
@@ -147,5 +149,6 @@ async function createWorkerPool ({
 }
 
 module.exports = {
-  createWorkerPool
+  createThreadPuddle,
+  createThreadPool: createThreadPuddle
 }

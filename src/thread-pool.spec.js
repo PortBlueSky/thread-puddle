@@ -1,6 +1,6 @@
 /* eslint-env jest */
 const path = require('path')
-const { createWorkerPool } = require('./index')
+const { createThreadPuddle } = require('./index')
 
 const workerPath = path.resolve(__dirname, '../test/assets/test-worker.js')
 
@@ -8,7 +8,7 @@ describe('Thread Pool', () => {
   let pool = null
 
   beforeEach(async () => {
-    pool = await createWorkerPool({
+    pool = await createThreadPuddle({
       size: 2,
       workerPath,
       workerOptions: {
