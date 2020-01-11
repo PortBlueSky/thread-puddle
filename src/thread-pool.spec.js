@@ -8,7 +8,15 @@ describe('Thread Pool', () => {
   let pool = null
 
   beforeEach(async () => {
-    pool = await createWorkerPool({ size: 2, workerPath })
+    pool = await createWorkerPool({
+      size: 2,
+      workerPath,
+      workerOptions: {
+        workerData: {
+          test: 'test worker data'
+        }
+      }
+    })
   })
 
   afterEach(() => {
@@ -25,6 +33,14 @@ describe('Thread Pool', () => {
     const value = await pool.asyncFn('value')
 
     expect(value).toEqual('got async value')
+  })
+
+  it('hands down workerData with workerOptions for pool', async () => {
+    const data = await pool.getWorkerData()
+
+    expect(data).toEqual(expect.objectContaining({
+      test: 'test worker data'
+    }))
   })
 
   it('throws error if method is not available on worker', async () => {

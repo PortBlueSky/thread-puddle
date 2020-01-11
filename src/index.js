@@ -3,7 +3,13 @@ const { Worker, MessageChannel } = require('worker_threads')
 
 const workerProxyPath = path.resolve(__dirname, 'worker.js')
 
-async function createWorkerPool ({ size = 1, workerPath, startupTimeout = 3000 }) {
+async function createWorkerPool ({
+  size = 1,
+  workerPath,
+  workerOptions = {},
+  startupTimeout = 3000,
+  logger = console
+}) {
   const workers = []
   const availableWorkers = []
   const workerRequests = []
@@ -20,11 +26,22 @@ async function createWorkerPool ({ size = 1, workerPath, startupTimeout = 3000 }
   }
 
   for (let i = 1; i <= size; i += 1) {
-    const worker = new Worker(workerProxyPath)
+    const worker = new Worker(workerProxyPath, workerOptions)
     const { port1, port2 } = new MessageChannel()
-    const workerWithChannel = { id: i, worker, port: port2 }
+    const id = i
+    const workerWithChannel = { id, worker, port: port2 }
 
     // TODO: Handle worker thread errors (restart worker if recoverable)
+    worker.on('exit', (code) => {
+      // TODO: If !isTerminated, spawn new worker
+    })
+
+    worker.on('error', (err) => {
+      logger.error(`Worker ${id} Error:`, err)
+      logger.debug(`Restarting worker ${id} after uncaught error`)
+      // TODO: If !isTerminated, spawn new worker
+      // TODO: Count worker failures, after max failures, terminate pool
+    })
 
     worker.postMessage({ action: 'init', workerPath, port: port1, id: i }, [port1])
     port2.on('message', (msg) => {
