@@ -1,6 +1,6 @@
 /* eslint-env jest */
 const path = require('path')
-const { createPuddle } = require('./index')
+const { createPuddle, spawn } = require('./index')
 const debug = require('debug')
 
 debug.enabled('puddle')
@@ -11,9 +11,8 @@ describe('Thread puddle', () => {
   let worker = null
 
   beforeEach(async () => {
-    worker = await createPuddle({
+    worker = await createPuddle(workerPath, {
       size: 2,
-      workerPath,
       workerOptions: {
         workerData: {
           test: 'test worker data'
@@ -96,7 +95,35 @@ describe('Thread puddle', () => {
     expect(worker.puddle).toHaveProperty('size', 2)
   })
 
+  it.todo('rejects waiting method calls when a worker crashes')
   it.todo('throws before starting a worker which exposes reserved keys (like puddle)')
-  it.todo('terminates puddle after a maximum of uncaughtErrors in workers')
-  it.todo('terminates puddle when workers fail without any methods being called')
+  it.todo('rejects open method calls when worker crashes')
+  it.todo('terminates puddle when workers fail without any methods being called (startup phase)')
+  it.todo('emits an exit event when a workers exits')
+  it.todo('emits an error event when a workers errors')
+})
+
+describe('Alias', () => {
+  let worker = null
+
+  beforeEach(async () => {
+    worker = await spawn(workerPath, {
+      size: 2,
+      workerOptions: {
+        workerData: {
+          test: 'test worker data'
+        }
+      }
+    })
+  })
+
+  afterEach(() => {
+    worker.puddle.terminate()
+  })
+
+  it('has a spawn method to create a worker thread pool', async () => {
+    const value = await worker.fn('value')
+
+    expect(value).toEqual('got value')
+  })
 })

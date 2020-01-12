@@ -5,9 +5,8 @@ const debug = require('debug')('puddle:master')
 const workerProxyPath = path.resolve(__dirname, 'worker.js')
 let threadIdOffset = 1
 
-async function createThreadPuddle ({
+async function createThreadPool (workerPath, {
   size = 1,
-  workerPath,
   workerOptions = {},
   startupTimeout = 3000
 }) {
@@ -43,7 +42,6 @@ async function createThreadPuddle ({
     worker.on('exit', (code) => {
       debug('worker %d exited with code %d', id, code)
       removeWorker(workerWithChannel)
-      // TODO: if all workes exited, terminate pool
     })
 
     worker.on('error', (err) => {
@@ -51,7 +49,7 @@ async function createThreadPuddle ({
       if (!isTerminated) {
         debug(`restarting worker ${id} after uncaught error`)
         createWorker(id)
-        // TODO: Count worker failures, after max failures, terminate pool
+        // TODO: if worker still has unresolved callbacks, reject them
       }
     })
 
@@ -184,6 +182,6 @@ async function createThreadPuddle ({
 }
 
 module.exports = {
-  createPuddle: createThreadPuddle,
-  createThreadPool: createThreadPuddle
+  createPuddle: createThreadPool,
+  spawn: createThreadPool
 }
