@@ -34,6 +34,8 @@ async function createThreadPuddle ({
   }
 
   const createWorker = (id) => {
+    debug('creating worker thread %s', id)
+
     const worker = new Worker(workerProxyPath, workerOptions)
     const { port1, port2 } = new MessageChannel()
     const workerWithChannel = { id, worker, port: port2 }
@@ -88,11 +90,7 @@ async function createThreadPuddle ({
   debug('filling puddle with thread liquid...')
 
   for (let i = threadIdOffset; i < size + threadIdOffset; i += 1) {
-    const id = i
-
-    debug('creating worker thread %s', id)
-
-    createWorker(id)
+    createWorker(i)
   }
 
   threadIdOffset += size
@@ -123,7 +121,7 @@ async function createThreadPuddle ({
   })
 
   const terminate = () => {
-    debug('Pulling the plug on the puddle...')
+    debug('pulling the plug on the puddle...')
 
     isTerminated = true
     for (const pWorker of workers) {
@@ -138,14 +136,14 @@ async function createThreadPuddle ({
     }, startupTimeout)
     const workerRequest = {
       resolve: (worker) => {
-        debug('Worker %d ready', worker.id)
+        debug('worker %d ready', worker.id)
 
         clearTimeout(timeout)
         availableWorkers.push(worker)
         resolve()
       },
       reject: (err) => {
-        debug('Worker %d startup failed', worker.id)
+        debug('worker %d startup failed', worker.id)
 
         clearTimeout(timeout)
         terminate()
@@ -157,7 +155,7 @@ async function createThreadPuddle ({
   })))
   availableWorkers.sort((a, b) => a.id < b.id ? -1 : 1)
 
-  debug('Puddle filled, happy splashing!')
+  debug('puddle filled, happy splashing!')
 
   const puddleInterface = {
     terminate
@@ -186,6 +184,6 @@ async function createThreadPuddle ({
 }
 
 module.exports = {
-  createThreadPuddle,
+  createPuddle: createThreadPuddle,
   createThreadPool: createThreadPuddle
 }

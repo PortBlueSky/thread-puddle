@@ -3,8 +3,30 @@
 
 A small library to handle Node.js [worker threads](https://nodejs.org/dist/latest-v13.x/docs/api/worker_threads.html), automatically exposing exported module methods using [Proxy Objects](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Proxy).
 
-_Example_:
+### Installation
+```
+npm install thread-puddle
+```
+
+### Usage Example
 
 ```js
-// TODO
+// worker.js
+module.exports = {
+  say: () => 'Hello!'
+}
+```
+
+```js
+// main.js
+const { createPuddle } = require('thread-puddle')
+
+const worker = createPuddle({
+  workerPath: '/path/to/worker.js',
+  size: 2
+})
+
+const result = await worker.say()
+
+console.log(result) // -> "Hello!"
 ```

@@ -1,6 +1,6 @@
 /* eslint-env jest */
 const path = require('path')
-const { createThreadPuddle } = require('./index')
+const { createPuddle } = require('./index')
 const debug = require('debug')
 
 debug.enabled('puddle')
@@ -11,7 +11,7 @@ describe('Thread puddle', () => {
   let worker = null
 
   beforeEach(async () => {
-    worker = await createThreadPuddle({
+    worker = await createPuddle({
       size: 2,
       workerPath,
       workerOptions: {
@@ -97,4 +97,6 @@ describe('Thread puddle', () => {
   })
 
   it.todo('throws before starting a worker which exposes reserved keys (like puddle)')
+  it.todo('terminates puddle after a maximum of uncaughtErrors in workers')
+  it.todo('terminates puddle when workers fail without any methods being called')
 })
