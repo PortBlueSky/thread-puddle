@@ -1,3 +1,7 @@
+<p align="center">
+  <img width="320" height="167" src="https://github.com/kommander/thread-puddle/blob/master/assets/tp-logo.png?raw=true">
+</p>
+
 # thread-puddle
 ## Turn any module into a worker thread
 
