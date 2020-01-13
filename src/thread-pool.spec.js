@@ -97,6 +97,7 @@ describe('Thread puddle', () => {
     expect(worker.puddle).toHaveProperty('size', 2)
   })
 
+  it.todo('has a maximum queue length and fails method calls if full')
   it.todo('rejects waiting method calls when a worker crashes')
   it.todo('rejects open method calls when worker crashes')
   it.todo('terminates puddle when workers fail without any methods being called (startup phase)')
