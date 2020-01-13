@@ -68,6 +68,8 @@ describe('Thread puddle', () => {
     ])
   })
 
+  it.todo('always only calls one method per worker')
+
   it('forwards worker method errors with worker stack trace', async () => {
     try {
       await worker.fnError('worker triggered this error message')
@@ -96,11 +98,13 @@ describe('Thread puddle', () => {
   })
 
   it.todo('rejects waiting method calls when a worker crashes')
-  it.todo('throws before starting a worker which exposes reserved keys (like puddle)')
   it.todo('rejects open method calls when worker crashes')
   it.todo('terminates puddle when workers fail without any methods being called (startup phase)')
-  it.todo('emits an exit event when a workers exits')
-  it.todo('emits an error event when a workers errors')
+  it.todo('emits an exit event when a worker exits')
+  it.todo('emits an error event when a worker errors')
+  it.todo('rejects modules not exporting any function')
+  it.todo('rejects modules not exporting an object')
+  it.todo('throws before starting a worker which exposes reserved keys (like puddle)')
 })
 
 describe('Alias', () => {

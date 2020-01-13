@@ -3,8 +3,7 @@ const { createPuddle } = require('../../src')
 const path = require('path')
 
 async function start () {
-  const worker = await createPuddle({
-    workerPath: path.resolve(__dirname, 'worker.js'),
+  const worker = await createPuddle(path.resolve(__dirname, 'worker.js'), {
     size: 2
   })
 
