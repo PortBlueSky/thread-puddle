@@ -107,17 +107,13 @@ describe('Thread puddle', () => {
   })
 
   it('rejects open method calls when a worker crashes', async () => {
-    try {
-      await Promise.all([
-        worker.waitForUncaughtException(10),
-        worker.waitForUncaughtException(10),
-        worker.waitForUncaughtException(10),
-        worker.waitForUncaughtException(10)
-      ])
-      expect(true).toBe(false)
-    } catch (err) {
-      expect(err).toHaveProperty('message', 'Worker failure')
-    }
+    const result = await Promise.all([
+      worker.waitForUncaughtException(10).catch(err => err),
+      worker.waitForUncaughtException(10).catch(err => err),
+      worker.waitForUncaughtException(10).catch(err => err),
+      worker.waitForUncaughtException(10).catch(err => err)
+    ])
+    result.map(err => expect(err).toHaveProperty('message', 'Worker failure'))
   })
 
   it.todo('rejects waiting method calls when a worker exits')
