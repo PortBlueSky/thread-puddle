@@ -100,6 +100,8 @@ describe('Thread puddle', () => {
   it.todo('has a maximum queue length and fails method calls if full')
   it.todo('rejects waiting method calls when a worker crashes')
   it.todo('rejects open method calls when worker crashes')
+  it.todo('rejects waiting method calls when a worker exits')
+  it.todo('rejects open method calls when worker exits')
   it.todo('terminates puddle when workers fail without any methods being called (startup phase)')
   it.todo('emits an exit event when a worker exits')
   it.todo('emits an error event when a worker errors')
