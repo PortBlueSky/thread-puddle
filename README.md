@@ -25,7 +25,7 @@ module.exports = {
 // main.js
 const { createPuddle } = require('thread-puddle')
 
-const worker = createPuddle('/path/to/worker.js', {
+const worker = await createPuddle('/path/to/worker.js', {
   size: 2
 })
 
