@@ -68,7 +68,16 @@ describe('Thread puddle', () => {
     ])
   })
 
-  it.todo('always only calls one method per worker')
+  it('always only calls one method per worker', async () => {
+    await Promise.all([
+      worker.throwIfCalledAtTheSameTime(10),
+      worker.throwIfCalledAtTheSameTime(10),
+      worker.throwIfCalledAtTheSameTime(10),
+      worker.throwIfCalledAtTheSameTime(10),
+      worker.throwIfCalledAtTheSameTime(10),
+      worker.throwIfCalledAtTheSameTime(10)
+    ])
+  })
 
   it('forwards worker method errors with worker stack trace', async () => {
     try {
@@ -97,6 +106,8 @@ describe('Thread puddle', () => {
     expect(worker.puddle).toHaveProperty('size', 2)
   })
 
+  it.todo('allows to specifiy transferables per method (worker to main)')
+  it.todo('allows to specifiy transferables per method (main to worker)')
   it.todo('has a maximum queue length and fails method calls if full')
   it.todo('rejects waiting method calls when a worker crashes')
   it.todo('rejects open method calls when worker crashes')
