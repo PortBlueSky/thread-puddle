@@ -19,6 +19,12 @@ module.exports = {
       process.emit('error', err)
     }, 100)
   },
+  waitForUncaughtException: (timeout) => {
+    return new Promise(resolve => setTimeout(() => {
+      const err = new Error('Worker failure')
+      process.emit('error', err)
+    }, timeout))
+  },
   throwIfCalledAtTheSameTime: async (timeout) => {
     if (currentlyHandling) {
       throw new Error('Should not be called while another method call is handled')

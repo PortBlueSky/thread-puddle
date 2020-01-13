@@ -106,16 +106,28 @@ describe('Thread puddle', () => {
     expect(worker.puddle).toHaveProperty('size', 2)
   })
 
-  it.todo('allows to specifiy transferables per method (worker to main)')
-  it.todo('allows to specifiy transferables per method (main to worker)')
-  it.todo('has a maximum queue length and fails method calls if full')
-  it.todo('rejects waiting method calls when a worker crashes')
-  it.todo('rejects open method calls when worker crashes')
+  it('rejects open method calls when a worker crashes', async () => {
+    try {
+      await Promise.all([
+        worker.waitForUncaughtException(10),
+        worker.waitForUncaughtException(10),
+        worker.waitForUncaughtException(10),
+        worker.waitForUncaughtException(10)
+      ])
+      expect(true).toBe(false)
+    } catch (err) {
+      expect(err).toHaveProperty('message', 'Worker failure')
+    }
+  })
+
   it.todo('rejects waiting method calls when a worker exits')
   it.todo('rejects open method calls when worker exits')
   it.todo('terminates puddle when workers fail without any methods being called (startup phase)')
   it.todo('emits an exit event when a worker exits')
   it.todo('emits an error event when a worker errors')
+  it.todo('allows to specifiy transferables per method (worker to main)')
+  it.todo('allows to specifiy transferables per method (main to worker)')
+  it.todo('has a maximum queue length and fails method calls if full')
   it.todo('rejects modules not exporting any function')
   it.todo('rejects modules not exporting an object')
   it.todo('throws before starting a worker which exposes reserved keys (like puddle)')

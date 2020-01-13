@@ -47,9 +47,12 @@ async function createThreadPool (workerPath, {
     worker.on('error', (err) => {
       debug(`worker ${id} Error: %s`, err.message)
       if (!isTerminated) {
+        for (const callbackId in workerCallbacks[id]) {
+          workerCallbacks[id][callbackId].reject(err)
+        }
+
         debug(`restarting worker ${id} after uncaught error`)
         createWorker(id)
-        // TODO: if worker still has unresolved callbacks, reject them
       }
     })
 
@@ -57,15 +60,15 @@ async function createThreadPool (workerPath, {
     port2.on('message', (msg) => {
       switch (msg.action) {
         case 'resolve': {
-          const { resolve } = workerCallbacks[msg.callbackId]
-          delete workerCallbacks[msg.callbackId]
+          const { resolve } = workerCallbacks[id][msg.callbackId]
+          delete workerCallbacks[id][msg.callbackId]
           onReady(workerWithChannel)
           resolve(msg.result)
           break
         }
         case 'reject': {
-          const { reject } = workerCallbacks[msg.callbackId]
-          delete workerCallbacks[msg.callbackId]
+          const { reject } = workerCallbacks[id][msg.callbackId]
+          delete workerCallbacks[id][msg.callbackId]
           const err = new Error(msg.message)
           err.stack = msg.stack
           onReady(workerWithChannel)
@@ -82,6 +85,8 @@ async function createThreadPool (workerPath, {
       }
     })
 
+    workerCallbacks[id] = {}
+
     workers.push(workerWithChannel)
   }
 
@@ -95,7 +100,7 @@ async function createThreadPool (workerPath, {
 
   const callOnWorker = (worker, key, args, resolve, reject) => {
     const callbackId = callbackCount++
-    workerCallbacks[callbackId] = { resolve, reject }
+    workerCallbacks[worker.id][callbackId] = { resolve, reject }
     worker.port.postMessage({
       action: 'call',
       key,
