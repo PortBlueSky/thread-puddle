@@ -116,8 +116,28 @@ describe('Thread puddle', () => {
     result.map(err => expect(err).toHaveProperty('message', 'Worker failure'))
   })
 
-  it.todo('rejects waiting method calls when a worker exits')
-  it.todo('rejects open method calls when worker exits')
+  it('rejects open method calls when worker exits', async () => {
+    const result = await Promise.all([
+      worker.exitWorker(10).catch(err => err),
+      worker.exitWorker(10).catch(err => err)
+    ])
+    result.map(err => expect(err).toHaveProperty('message', 'Worker thread exited before resolving'))
+  })
+
+  it('rejects waiting method calls when all workers exited', async () => {
+    const [one, two, three, four] = await Promise.all([
+      worker.exitWorker(10).catch(err => err),
+      worker.exitWorker(10).catch(err => err),
+      worker.exitWorker(10).catch(err => err),
+      worker.exitWorker(10).catch(err => err)
+    ])
+
+    expect(one).toHaveProperty('message', 'Worker thread exited before resolving')
+    expect(two).toHaveProperty('message', 'Worker thread exited before resolving')
+    expect(three).toHaveProperty('message', 'All workers exited before resolving')
+    expect(four).toHaveProperty('message', 'All workers exited before resolving')
+  })
+
   it.todo('terminates puddle when workers fail without any methods being called (startup phase)')
   it.todo('emits an exit event when a worker exits')
   it.todo('emits an error event when a worker errors')

@@ -37,11 +37,27 @@ async function createThreadPool (workerPath, {
 
     const worker = new Worker(workerProxyPath, workerOptions)
     const { port1, port2 } = new MessageChannel()
-    const workerWithChannel = { id, worker, port: port2 }
+    const workerWithChannel = { id, worker, port: port2, error: false }
 
     worker.on('exit', (code) => {
       debug('worker %d exited with code %d', id, code)
+
+      if (!workerWithChannel.error) {
+        const err = new Error('Worker thread exited before resolving')
+
+        for (const callbackId in workerCallbacks[id]) {
+          workerCallbacks[id][callbackId].reject(err)
+        }
+      }
+
       removeWorker(workerWithChannel)
+
+      if (workers.length === 0) {
+        const err = new Error('All workers exited before resolving')
+        for (const workerRequest of workerRequests) {
+          workerRequest.reject(err)
+        }
+      }
     })
 
     worker.on('error', (err) => {
@@ -50,6 +66,7 @@ async function createThreadPool (workerPath, {
         for (const callbackId in workerCallbacks[id]) {
           workerCallbacks[id][callbackId].reject(err)
         }
+        workerWithChannel.error = err
 
         debug(`restarting worker ${id} after uncaught error`)
         createWorker(id)
@@ -180,7 +197,9 @@ async function createThreadPool (workerPath, {
         return target.puddle
       }
       return (...args) => new Promise((resolve, reject) => {
-        getWorker().then(worker => callOnWorker(worker, key, args, resolve, reject))
+        getWorker()
+          .then(worker => callOnWorker(worker, key, args, resolve, reject))
+          .catch(err => reject(err))
       })
     }
   })

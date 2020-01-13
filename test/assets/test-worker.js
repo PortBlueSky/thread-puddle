@@ -34,5 +34,8 @@ module.exports = {
       currentlyHandling = false
       resolve()
     }, timeout))
-  }
+  },
+  exitWorker: async (timeout) => new Promise(resolve => setTimeout(() => {
+    process.exit()
+  }, timeout))
 }
