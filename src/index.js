@@ -8,7 +8,7 @@ let threadIdOffset = 1
 async function createThreadPool (workerPath, {
   size = 1,
   workerOptions = {},
-  startupTimeout = 3000
+  startupTimeout = 30000
 }) {
   debug('carving out a puddle...')
 
@@ -20,10 +20,19 @@ async function createThreadPool (workerPath, {
   let isTerminated = false
 
   const onReady = (worker) => {
+    if (worker.callQueue.length > 0) {
+      const waitingCall = worker.callQueue.shift()
+      callOnWorker(worker, ...waitingCall)
+      return
+    }
+
     if (workerRequests.length) {
       const request = workerRequests.shift()
-      return request.resolve(worker)
+      request.resolve(worker)
+      return
     }
+
+    worker.busy = false
     availableWorkers.push(worker)
   }
 
@@ -37,7 +46,14 @@ async function createThreadPool (workerPath, {
 
     const worker = new Worker(workerProxyPath, workerOptions)
     const { port1, port2 } = new MessageChannel()
-    const workerWithChannel = { id, worker, port: port2, error: false }
+    const workerWithChannel = {
+      id,
+      worker,
+      port: port2,
+      error: false,
+      callQueue: [],
+      busy: false
+    }
 
     worker.on('exit', (code) => {
       debug('worker %d exited with code %d', id, code)
@@ -115,7 +131,8 @@ async function createThreadPool (workerPath, {
 
   threadIdOffset += size
 
-  const callOnWorker = (worker, key, args, resolve, reject) => {
+  function callOnWorker (worker, key, args, resolve, reject) {
+    worker.busy = true
     const callbackId = callbackCount++
     workerCallbacks[worker.id][callbackId] = { resolve, reject }
     worker.port.postMessage({
@@ -126,7 +143,7 @@ async function createThreadPool (workerPath, {
     })
   }
 
-  const getWorker = () => new Promise((resolve, reject) => {
+  const getAvailableWorker = () => new Promise((resolve, reject) => {
     if (isTerminated) {
       return reject(new Error('Worker pool already terminated.'))
     }
@@ -184,8 +201,27 @@ async function createThreadPool (workerPath, {
     get: () => workers.length
   })
 
+  const allWorkersInterface = new Proxy({}, {
+    get: (target, key) => {
+      if (key === 'then') {
+        return undefined
+      }
+
+      return (...args) => Promise.all(
+        workers.map(worker => new Promise((resolve, reject) => {
+          if (!worker.busy) {
+            callOnWorker(worker, key, args, resolve, reject)
+            return
+          }
+          worker.callQueue.push({ key, args, resolve, reject })
+        }))
+      )
+    }
+  })
+
   return new Proxy({
-    puddle: puddleInterface
+    puddle: puddleInterface,
+    all: allWorkersInterface
   }, {
     get: (target, key) => {
       // If the proxy is returned from an async function,
@@ -193,11 +229,11 @@ async function createThreadPool (workerPath, {
       if (key === 'then') {
         return undefined
       }
-      if (key === 'puddle') {
-        return target.puddle
+      if (['puddle', 'all'].includes(key)) {
+        return target[key]
       }
       return (...args) => new Promise((resolve, reject) => {
-        getWorker()
+        getAvailableWorker()
           .then(worker => callOnWorker(worker, key, args, resolve, reject))
           .catch(err => reject(err))
       })

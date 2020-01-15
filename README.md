@@ -23,9 +23,9 @@ module.exports = {
 
 ```js
 // main.js
-const { createPuddle } = require('thread-puddle')
+const { spawn } = require('thread-puddle')
 
-const worker = await createPuddle('/path/to/worker.js', {
+const worker = await spawn('/path/to/worker.js', {
   size: 2
 })
 

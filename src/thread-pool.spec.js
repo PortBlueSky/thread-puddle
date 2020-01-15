@@ -138,11 +138,43 @@ describe('Thread puddle', () => {
     expect(four).toHaveProperty('message', 'All workers exited before resolving')
   })
 
-  it.todo('terminates puddle when workers fail without any methods being called (startup phase)')
+  it('can call a method on all workers', async () => {
+    const [value1, value2] = await worker.all.fnWorkerNum('value')
+
+    expect([value1, value2]).toEqual([
+      'got value 25',
+      'got value 26'
+    ])
+  })
+
+  it('waits for other calls to be resolved before calling on all', async () => {
+    const results = await Promise.all([
+      worker.asyncFn('one', 25),
+      worker.asyncFn('two', 25),
+      worker.all.fnWorkerNum('value')
+    ])
+
+    expect(results).toEqual([
+      'got async one',
+      'got async two',
+      [
+        'got value 27',
+        'got value 28'
+      ]
+    ])
+  })
+
   it.todo('emits an exit event when a worker exits')
+  it.todo('allows to manually respawn workers after error')
+  it.todo('allows to manually respawn workers after exit')
+  it.todo('calling respawn only spawns a worker once again, ignores all other calls')
   it.todo('emits an error event when a worker errors')
+  it.todo('terminates puddle when workers fail without any methods being called (startup phase)')
   it.todo('allows to specifiy transferables per method (worker to main)')
+  // -> return Transferable(result)
   it.todo('allows to specifiy transferables per method (main to worker)')
+  // -> worker.method(transferableValue, Transferable([transferableValue]))
+  //    transferables returns an instance of Transferable which can be checked by pool per method call
   it.todo('has a maximum queue length and fails method calls if full')
   it.todo('rejects modules not exporting any function')
   it.todo('rejects modules not exporting an object')
