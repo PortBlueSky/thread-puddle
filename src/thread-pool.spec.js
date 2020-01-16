@@ -6,6 +6,7 @@ const debug = require('debug')
 debug.enabled('puddle')
 
 const basicWorkerPath = path.resolve(__dirname, '../test/workers/basic.js')
+const transferableWorkerPath = path.resolve(__dirname, '../test/workers/transferable.js')
 
 describe('Basic Features', () => {
   let worker = null
@@ -111,11 +112,6 @@ describe('Basic Features', () => {
   it.todo('calling respawn only spawns a worker once again, ignores all other calls')
   it.todo('emits an error event when a worker errors')
   it.todo('terminates puddle when workers fail without any methods being called (startup phase)')
-  it.todo('allows to specifiy transferables per method (worker to main)')
-  // -> return Transferable(result)
-  it.todo('allows to specifiy transferables per method (main to worker)')
-  // -> worker.method(transferableValue, Transferable([transferableValue]))
-  //    transferables returns an instance of Transferable which can be checked by pool per method call
   it.todo('rejects modules not exporting any function')
   it.todo('rejects modules not exporting an object')
   it.todo('throws before starting a worker which exposes reserved keys (like puddle)')
@@ -199,12 +195,7 @@ describe('Alias', () => {
 
   beforeEach(async () => {
     worker = await spawn(basicWorkerPath, {
-      size: 2,
-      workerOptions: {
-        workerData: {
-          test: 'test worker data'
-        }
-      }
+      size: 2
     })
   })
 
@@ -217,4 +208,56 @@ describe('Alias', () => {
 
     expect(value).toEqual('got value')
   })
+})
+
+describe('Transferable', () => {
+  let worker = null
+
+  beforeEach(async () => {
+    worker = await spawn(transferableWorkerPath)
+  })
+
+  afterEach(() => {
+    worker.puddle.terminate()
+  })
+
+  it('can transfer a return value from a worker', async () => {
+    const arr1 = await worker.getArray()
+    const arr2 = await worker.tryToUseArray()
+    const arr3 = await worker.getTransferredArray()
+    const err = await worker.tryToUseArray().catch(err => err)
+
+    expect(arr1).toEqual(new Uint8Array([1, 2, 3, 4]))
+    expect(arr2).toEqual(new Uint8Array([2, 3, 4, 5]))
+    expect(arr3).toEqual(new Uint8Array([1, 2, 3, 4]))
+    expect(err).toHaveProperty('message', 'Cannot perform %TypedArray%.prototype.map on a neutered ArrayBuffer')
+  })
+
+  it('wraps transferred UintArrays into instance', async () => {
+    const arr1 = await worker.getArray()
+    const arr2 = await worker.get16Array()
+    const arr3 = await worker.get32Array()
+    const arr4 = await worker.getTransferredArray()
+    const arr5 = await worker.getTransferred16Array()
+    const arr6 = await worker.getTransferred32Array()
+
+    expect(arr1).toEqual(new Uint8Array([1, 2, 3, 4]))
+    expect(arr2).toEqual(new Uint16Array([1, 2, 3, 4]))
+    expect(arr3).toEqual(new Uint32Array([1, 2, 3, 4]))
+    expect(arr4).toEqual(new Uint8Array([1, 2, 3, 4]))
+    expect(arr5).toEqual(new Uint16Array([1, 2, 3, 4]))
+    expect(arr6).toEqual(new Uint32Array([1, 2, 3, 4]))
+  })
+
+  it('does not wrap ArrayBuffers transferred directly', async () => {
+    const arrBuffer1 = await worker.getArrayBuffer()
+    const arrBuffer2 = await worker.getTransferredArrayBuffer()
+
+    expect(arrBuffer1).toBeInstanceOf(ArrayBuffer)
+    expect(arrBuffer2).toBeInstanceOf(ArrayBuffer)
+  })
+
+  it.todo('allows to specifiy transferables per method (main to worker)')
+  // -> worker.method(transferableValue, Transferable([transferableValue]))
+  //    transferables returns an instance of Transferable which can be checked by pool per method call
 })

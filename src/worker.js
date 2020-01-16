@@ -1,5 +1,6 @@
 const { parentPort } = require('worker_threads')
 const createDebug = require('debug')
+const { Transferable } = require('./Transferable')
 
 parentPort.once('message', (msg) => {
   if (msg.action === 'init') {
@@ -22,7 +23,17 @@ parentPort.once('message', (msg) => {
               throw new Error(`"${key}" is not a function in this worker thread`)
             }
             const result = await worker[key](...args)
-            port.postMessage({ action: 'resolve', callbackId, result })
+
+            if (result instanceof Transferable) {
+              port.postMessage({
+                action: 'resolve',
+                callbackId,
+                result: result.transferList[0],
+                bytesPerElement: result.bytesPerElement
+              }, result.transferList)
+            } else {
+              port.postMessage({ action: 'resolve', callbackId, result })
+            }
           } catch ({ message, stack }) {
             debug(message)
             port.postMessage({ action: 'reject', callbackId, message, stack })

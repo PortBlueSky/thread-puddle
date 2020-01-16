@@ -1,15 +1,22 @@
 const path = require('path')
 const { Worker, MessageChannel } = require('worker_threads')
 const debug = require('debug')('puddle:master')
+const { Transferable } = require('./Transferable')
 
 const workerProxyPath = path.resolve(__dirname, 'worker.js')
 let threadIdOffset = 1
+
+const uintConstructs = {
+  1: Uint8Array,
+  2: Uint16Array,
+  4: Uint32Array
+}
 
 async function createThreadPool (workerPath, {
   size = 1,
   workerOptions = {},
   startupTimeout = 30000
-}) {
+} = {}) {
   debug('carving out a puddle...')
 
   const workers = []
@@ -96,7 +103,13 @@ async function createThreadPool (workerPath, {
           const { resolve } = workerCallbacks[id][msg.callbackId]
           delete workerCallbacks[id][msg.callbackId]
           onReady(workerWithChannel)
-          resolve(msg.result)
+
+          if (msg.bytesPerElement > 0) {
+            resolve(new uintConstructs[msg.bytesPerElement](msg.result))
+          } else {
+            resolve(msg.result)
+          }
+
           break
         }
         case 'reject': {
@@ -243,5 +256,6 @@ async function createThreadPool (workerPath, {
 
 module.exports = {
   createPuddle: createThreadPool,
-  spawn: createThreadPool
+  spawn: createThreadPool,
+  Transferable
 }
