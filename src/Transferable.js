@@ -1,19 +1,22 @@
-function Transferable (arg) {
+function Transferable (obj, transferables) {
   if (!(this instanceof Transferable)) {
-    return new Transferable(arg)
+    return new Transferable(obj, transferables)
   }
 
-  this.bytesPerElement = 0
-  this.value = arg
-  this.transferList = [].concat(arg).map((obj) => {
-    if (obj instanceof Uint8Array || obj instanceof Uint16Array || obj instanceof Uint32Array) {
-      this.bytesPerElement = obj.BYTES_PER_ELEMENT
-      return obj.buffer
+  this.obj = obj
+  this.transferables = [].concat(transferables).map((value) => {
+    if (value instanceof Uint8Array || value instanceof Uint16Array || value instanceof Uint32Array) {
+      return value.buffer
     }
-    return obj
+    return value
   })
 }
 
+function withTransfer (obj, transferables = []) {
+  return new Transferable(obj, transferables)
+}
+
 module.exports = {
-  Transferable
+  Transferable,
+  withTransfer
 }

@@ -1,6 +1,6 @@
 /* eslint-env jest */
 const path = require('path')
-const { createPuddle, spawn } = require('./index')
+const { createPuddle, spawn, withTransfer } = require('./index')
 const debug = require('debug')
 
 debug.enabled('puddle')
@@ -257,7 +257,29 @@ describe('Transferable', () => {
     expect(arrBuffer2).toBeInstanceOf(ArrayBuffer)
   })
 
-  it.todo('allows to specifiy transferables per method (main to worker)')
-  // -> worker.method(transferableValue, Transferable([transferableValue]))
-  //    transferables returns an instance of Transferable which can be checked by pool per method call
+  it('allows to specifiy transferables per method (main to worker)', async () => {
+    const uint8Array = new Uint8Array([1, 2, 3, 4])
+    const uint16Array = new Uint16Array([1, 2, 3, 4])
+    const uint32Array = new Uint32Array([1, 2, 3, 4])
+
+    const results = await Promise.all([
+      worker.setArray(uint8Array),
+      worker.set16Array(uint16Array),
+      worker.set32Array(uint32Array),
+      worker.setTransferredArray(withTransfer(uint8Array, [uint8Array])),
+      worker.setTransferred16Array(withTransfer(uint16Array, [uint16Array])),
+      worker.setTransferred32Array(withTransfer(uint32Array, [uint32Array]))
+    ])
+
+    results.map(result => expect(result).toEqual('ok'))
+
+    try {
+      uint32Array.map(i => i + 1)
+      expect(true).toBe(false)
+    } catch (err) {
+      expect(err).toHaveProperty('message', 'Cannot perform %TypedArray%.prototype.map on a neutered ArrayBuffer')
+    }
+  })
+
+  it.todo('can transfer a buffer to worker, manipulate it and transfer it back')
 })

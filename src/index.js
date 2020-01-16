@@ -1,16 +1,10 @@
 const path = require('path')
 const { Worker, MessageChannel } = require('worker_threads')
 const debug = require('debug')('puddle:master')
-const { Transferable } = require('./Transferable')
+const { Transferable, withTransfer } = require('./Transferable')
 
 const workerProxyPath = path.resolve(__dirname, 'worker.js')
 let threadIdOffset = 1
-
-const uintConstructs = {
-  1: Uint8Array,
-  2: Uint16Array,
-  4: Uint32Array
-}
 
 async function createThreadPool (workerPath, {
   size = 1,
@@ -103,13 +97,7 @@ async function createThreadPool (workerPath, {
           const { resolve } = workerCallbacks[id][msg.callbackId]
           delete workerCallbacks[id][msg.callbackId]
           onReady(workerWithChannel)
-
-          if (msg.bytesPerElement > 0) {
-            resolve(new uintConstructs[msg.bytesPerElement](msg.result))
-          } else {
-            resolve(msg.result)
-          }
-
+          resolve(msg.result)
           break
         }
         case 'reject': {
@@ -148,12 +136,22 @@ async function createThreadPool (workerPath, {
     worker.busy = true
     const callbackId = callbackCount++
     workerCallbacks[worker.id][callbackId] = { resolve, reject }
+
+    const transferables = []
+    const iteratedArgs = args.map((arg) => {
+      if (arg instanceof Transferable) {
+        transferables.push(...arg.transferables)
+        return arg.obj
+      }
+      return arg
+    })
+
     worker.port.postMessage({
       action: 'call',
       key,
       callbackId,
-      args
-    })
+      args: iteratedArgs
+    }, transferables)
   }
 
   const getAvailableWorker = () => new Promise((resolve, reject) => {
@@ -242,6 +240,7 @@ async function createThreadPool (workerPath, {
       if (key === 'then') {
         return undefined
       }
+      // TODO: use pool instead of puddle
       if (['puddle', 'all'].includes(key)) {
         return target[key]
       }
@@ -257,5 +256,5 @@ async function createThreadPool (workerPath, {
 module.exports = {
   createPuddle: createThreadPool,
   spawn: createThreadPool,
-  Transferable
+  withTransfer
 }

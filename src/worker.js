@@ -28,9 +28,8 @@ parentPort.once('message', (msg) => {
               port.postMessage({
                 action: 'resolve',
                 callbackId,
-                result: result.transferList[0],
-                bytesPerElement: result.bytesPerElement
-              }, result.transferList)
+                result: result.obj
+              }, result.transferables)
             } else {
               port.postMessage({ action: 'resolve', callbackId, result })
             }
