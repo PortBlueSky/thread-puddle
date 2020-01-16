@@ -5,13 +5,13 @@ const debug = require('debug')
 
 debug.enabled('puddle')
 
-const workerPath = path.resolve(__dirname, '../test/assets/test-worker.js')
+const basicWorkerPath = path.resolve(__dirname, '../test/workers/basic.js')
 
-describe('Thread puddle', () => {
+describe('Basic Features', () => {
   let worker = null
 
   beforeEach(async () => {
-    worker = await createPuddle(workerPath, {
+    worker = await createPuddle(basicWorkerPath, {
       size: 2,
       workerOptions: {
         workerData: {
@@ -79,13 +79,68 @@ describe('Thread puddle', () => {
     ])
   })
 
+  it('can call a method on all workers', async () => {
+    const [value1, value2] = await worker.all.fnWorkerNum('value')
+
+    expect([value1, value2]).toEqual([
+      'got value 13',
+      'got value 14'
+    ])
+  })
+
+  it('waits for other calls to be resolved before calling on all', async () => {
+    const results = await Promise.all([
+      worker.asyncFn('one', 25),
+      worker.asyncFn('two', 25),
+      worker.all.fnWorkerNum('value')
+    ])
+
+    expect(results).toEqual([
+      'got async one',
+      'got async two',
+      [
+        'got value 15',
+        'got value 16'
+      ]
+    ])
+  })
+
+  it.todo('emits an exit event when a worker exits')
+  it.todo('allows to manually respawn workers after error')
+  it.todo('allows to manually respawn workers after exit')
+  it.todo('calling respawn only spawns a worker once again, ignores all other calls')
+  it.todo('emits an error event when a worker errors')
+  it.todo('terminates puddle when workers fail without any methods being called (startup phase)')
+  it.todo('allows to specifiy transferables per method (worker to main)')
+  // -> return Transferable(result)
+  it.todo('allows to specifiy transferables per method (main to worker)')
+  // -> worker.method(transferableValue, Transferable([transferableValue]))
+  //    transferables returns an instance of Transferable which can be checked by pool per method call
+  it.todo('rejects modules not exporting any function')
+  it.todo('rejects modules not exporting an object')
+  it.todo('throws before starting a worker which exposes reserved keys (like puddle)')
+})
+
+describe('Error Handling', () => {
+  let worker = null
+
+  beforeEach(async () => {
+    worker = await createPuddle(basicWorkerPath, {
+      size: 2
+    })
+  })
+
+  afterEach(() => {
+    worker.puddle.terminate()
+  })
+
   it('forwards worker method errors with worker stack trace', async () => {
     try {
       await worker.fnError('worker triggered this error message')
       expect(false).toBe(true)
     } catch (err) {
       expect(err).toHaveProperty('message', 'worker triggered this error message')
-      expect(err).toHaveProperty('stack', expect.stringContaining('assets/test-worker.js'))
+      expect(err).toHaveProperty('stack', expect.stringContaining('workers/basic.js'))
     }
   })
 
@@ -95,11 +150,11 @@ describe('Thread puddle', () => {
       expect(false).toBe(true)
     } catch (err) {
       expect(err).toHaveProperty('message', 'Worker failure')
-      expect(err).toHaveProperty('stack', expect.stringContaining('assets/test-worker.js'))
+      expect(err).toHaveProperty('stack', expect.stringContaining('workers/basic.js'))
     }
   })
 
-  it('handles uncaught exceptions in worker', async () => {
+  it('respawns worker afer uncaught exceptions', async () => {
     await worker.triggerUncaughtException()
     await new Promise((resolve) => setTimeout(resolve, 500))
 
@@ -137,55 +192,13 @@ describe('Thread puddle', () => {
     expect(three).toHaveProperty('message', 'All workers exited before resolving')
     expect(four).toHaveProperty('message', 'All workers exited before resolving')
   })
-
-  it('can call a method on all workers', async () => {
-    const [value1, value2] = await worker.all.fnWorkerNum('value')
-
-    expect([value1, value2]).toEqual([
-      'got value 25',
-      'got value 26'
-    ])
-  })
-
-  it('waits for other calls to be resolved before calling on all', async () => {
-    const results = await Promise.all([
-      worker.asyncFn('one', 25),
-      worker.asyncFn('two', 25),
-      worker.all.fnWorkerNum('value')
-    ])
-
-    expect(results).toEqual([
-      'got async one',
-      'got async two',
-      [
-        'got value 27',
-        'got value 28'
-      ]
-    ])
-  })
-
-  it.todo('emits an exit event when a worker exits')
-  it.todo('allows to manually respawn workers after error')
-  it.todo('allows to manually respawn workers after exit')
-  it.todo('calling respawn only spawns a worker once again, ignores all other calls')
-  it.todo('emits an error event when a worker errors')
-  it.todo('terminates puddle when workers fail without any methods being called (startup phase)')
-  it.todo('allows to specifiy transferables per method (worker to main)')
-  // -> return Transferable(result)
-  it.todo('allows to specifiy transferables per method (main to worker)')
-  // -> worker.method(transferableValue, Transferable([transferableValue]))
-  //    transferables returns an instance of Transferable which can be checked by pool per method call
-  it.todo('has a maximum queue length and fails method calls if full')
-  it.todo('rejects modules not exporting any function')
-  it.todo('rejects modules not exporting an object')
-  it.todo('throws before starting a worker which exposes reserved keys (like puddle)')
 })
 
 describe('Alias', () => {
   let worker = null
 
   beforeEach(async () => {
-    worker = await spawn(workerPath, {
+    worker = await spawn(basicWorkerPath, {
       size: 2,
       workerOptions: {
         workerData: {
