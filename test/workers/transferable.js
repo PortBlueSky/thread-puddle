@@ -49,5 +49,15 @@ module.exports = {
     }
     return 'ok'
   },
-  tryToUseArray: () => uint8Array.map(v => v + 1)
+  tryToUseArray: () => uint8Array.map(v => v + 1),
+  manipulateAndTransfer: (arr) => {
+    const manipulated = arr.map(v => v + 1)
+    return withTransfer(manipulated, [manipulated])
+  },
+  transferNested: ({ value }) => {
+    const manipulated = value.map(v => v + 1)
+    return withTransfer({
+      value: manipulated
+    }, [manipulated])
+  }
 }

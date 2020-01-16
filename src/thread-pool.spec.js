@@ -281,5 +281,19 @@ describe('Transferable', () => {
     }
   })
 
-  it.todo('can transfer a buffer to worker, manipulate it and transfer it back')
+  it('can transfer a buffer to worker, manipulate it and transfer it back', async () => {
+    const uint8Array = new Uint8Array([1, 2, 3, 4])
+    const result = await worker.manipulateAndTransfer(withTransfer(uint8Array, [uint8Array]))
+
+    expect(result).toEqual(new Uint8Array([2, 3, 4, 5]))
+  })
+
+  it('can transfer nested values', async () => {
+    const uint8Array = new Uint8Array([1, 2, 3, 4])
+    const result = await worker.transferNested(withTransfer({
+      value: uint8Array
+    }, [uint8Array]))
+
+    expect(result).toEqual({ value: new Uint8Array([2, 3, 4, 5]) })
+  })
 })
