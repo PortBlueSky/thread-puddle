@@ -121,6 +121,15 @@ async function createThreadPool (workerPath, {
           onReady(workerWithChannel)
           break
         }
+        case 'startup-error': {
+          if (workerRequests.length) {
+            const request = workerRequests.shift()
+            const err = new Error(msg.message)
+            err.stack = msg.stack
+            request.reject(err)
+          }
+          break
+        }
         default: {
           throw new Error(`Unknown worker pool action "${msg.action}"`)
         }

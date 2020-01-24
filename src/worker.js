@@ -7,8 +7,14 @@ parentPort.once('message', (msg) => {
     const { workerPath, port, id } = msg
     const debug = createDebug(`puddle:thread:${id}`)
     debug('Initializing worker thread...')
+    let worker = null
 
-    const worker = require(workerPath)
+    try {
+      worker = require(workerPath)
+    } catch ({ message, stack }) {
+      port.postMessage({ action: 'startup-error', message, stack })
+      return
+    }
 
     worker.__ID__ = id
 

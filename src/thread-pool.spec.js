@@ -7,6 +7,7 @@ debug.enabled('puddle')
 
 const basicWorkerPath = path.resolve(__dirname, '../test/workers/basic.js')
 const transferableWorkerPath = path.resolve(__dirname, '../test/workers/transferable.js')
+const startupFailWorkerPath = path.resolve(__dirname, '../test/workers/startup-fail.js')
 
 describe('Basic Features', () => {
   let worker = null
@@ -194,13 +195,23 @@ describe('Error Handling', () => {
     expect(fn.mock.calls[0][0]).toHaveProperty('stack', expect.stringContaining('workers/basic.js'))
   })
 
-  it.todo('terminates puddle when workers fail in startup phase')
-  it.todo('rejects modules not exporting any function')
-  it.todo('rejects modules not exporting an object')
-  it.todo('throws before starting a worker which exposes reserved keys (like pool)')
   it.todo('[Proposal] allows to manually respawn workers after error')
   it.todo('[Proposal] allows to manually respawn workers after exit')
   it.todo('[Proposal] calling respawn only spawns a worker once again, ignores all other calls')
+})
+
+describe('Startup', () => {
+  it('terminates puddle when workers fail in startup phase', async () => {
+    const startupError = await spawn(startupFailWorkerPath, {
+      size: 2
+    }).catch(err => err)
+
+    expect(startupError).toHaveProperty('message', 'Failing before even exporting any method')
+  })
+
+  it.todo('rejects modules not exporting any function')
+  it.todo('rejects modules not exporting an object')
+  it.todo('throws before starting a worker which exposes reserved keys (like pool)')
 })
 
 describe('Termination', () => {
