@@ -11,6 +11,16 @@ parentPort.once('message', (msg) => {
 
     try {
       worker = require(workerPath)
+
+      let callables = 0
+      for (const key of Object.keys(worker)) {
+        if (typeof worker[key] === 'function') {
+          callables++
+        }
+      }
+      if (callables === 0) {
+        throw new Error('Worker should export at least one method')
+      }
     } catch ({ message, stack }) {
       port.postMessage({ action: 'startup-error', message, stack })
       return

@@ -8,6 +8,7 @@ debug.enabled('puddle')
 const basicWorkerPath = path.resolve(__dirname, '../test/workers/basic.js')
 const transferableWorkerPath = path.resolve(__dirname, '../test/workers/transferable.js')
 const startupFailWorkerPath = path.resolve(__dirname, '../test/workers/startup-fail.js')
+const noMethodWorkerPath = path.resolve(__dirname, '../test/workers/no-method.js')
 
 describe('Basic Features', () => {
   let worker = null
@@ -209,7 +210,14 @@ describe('Startup', () => {
     expect(startupError).toHaveProperty('message', 'Failing before even exporting any method')
   })
 
-  it.todo('rejects modules not exporting any function')
+  it('rejects modules not exporting any function', async () => {
+    const startupError = await spawn(noMethodWorkerPath, {
+      size: 2
+    }).catch(err => err)
+
+    expect(startupError).toHaveProperty('message', 'Worker should export at least one method')
+  })
+
   it.todo('rejects modules not exporting an object')
   it.todo('throws before starting a worker which exposes reserved keys (like pool)')
 })
