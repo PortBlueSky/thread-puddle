@@ -12,6 +12,10 @@ parentPort.once('message', (msg) => {
     try {
       worker = require(workerPath)
 
+      if (!(worker instanceof Object)) {
+        throw new Error(`Worker should export an object, got ${worker}`)
+      }
+
       let callables = 0
       for (const key of Object.keys(worker)) {
         if (typeof worker[key] === 'function') {

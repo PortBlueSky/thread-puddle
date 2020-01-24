@@ -9,6 +9,7 @@ const basicWorkerPath = path.resolve(__dirname, '../test/workers/basic.js')
 const transferableWorkerPath = path.resolve(__dirname, '../test/workers/transferable.js')
 const startupFailWorkerPath = path.resolve(__dirname, '../test/workers/startup-fail.js')
 const noMethodWorkerPath = path.resolve(__dirname, '../test/workers/no-method.js')
+const noObjectWorkerPath = path.resolve(__dirname, '../test/workers/no-object.js')
 
 describe('Basic Features', () => {
   let worker = null
@@ -218,7 +219,14 @@ describe('Startup', () => {
     expect(startupError).toHaveProperty('message', 'Worker should export at least one method')
   })
 
-  it.todo('rejects modules not exporting an object')
+  it('rejects modules not exporting an object', async () => {
+    const startupError = await spawn(noObjectWorkerPath, {
+      size: 2
+    }).catch(err => err)
+
+    expect(startupError).toHaveProperty('message', 'Worker should export an object, got null')
+  })
+
   it.todo('throws before starting a worker which exposes reserved keys (like pool)')
 })
 
