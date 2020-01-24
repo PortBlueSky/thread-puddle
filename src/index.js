@@ -211,6 +211,9 @@ async function createThreadPool (workerPath, {
   Object.defineProperty(puddleInterface, 'size', {
     get: () => workers.length
   })
+  Object.defineProperty(puddleInterface, 'isTerminated', {
+    get: () => isTerminated
+  })
 
   const allWorkersInterface = new Proxy({}, {
     get: (target, key) => {
@@ -232,6 +235,7 @@ async function createThreadPool (workerPath, {
 
   return new Proxy({
     puddle: puddleInterface,
+    pool: puddleInterface,
     all: allWorkersInterface
   }, {
     get: (target, key) => {
@@ -240,10 +244,11 @@ async function createThreadPool (workerPath, {
       if (key === 'then') {
         return undefined
       }
-      // TODO: use pool instead of puddle
-      if (['puddle', 'all'].includes(key)) {
+
+      if (['puddle', 'pool', 'all'].includes(key)) {
         return target[key]
       }
+
       return (...args) => new Promise((resolve, reject) => {
         getAvailableWorker()
           .then(worker => callOnWorker(worker, key, args, resolve, reject))

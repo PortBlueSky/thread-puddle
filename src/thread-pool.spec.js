@@ -106,15 +106,8 @@ describe('Basic Features', () => {
     ])
   })
 
+  it.todo('can call a method on a specific worker directly')
   it.todo('emits an exit event when a worker exits')
-  it.todo('allows to manually respawn workers after error')
-  it.todo('allows to manually respawn workers after exit')
-  it.todo('calling respawn only spawns a worker once again, ignores all other calls')
-  it.todo('emits an error event when a worker errors')
-  it.todo('terminates puddle when workers fail without any methods being called (startup phase)')
-  it.todo('rejects modules not exporting any function')
-  it.todo('rejects modules not exporting an object')
-  it.todo('throws before starting a worker which exposes reserved keys (like puddle)')
 })
 
 describe('Error Handling', () => {
@@ -187,6 +180,50 @@ describe('Error Handling', () => {
     expect(two).toHaveProperty('message', 'Worker thread exited before resolving')
     expect(three).toHaveProperty('message', 'All workers exited before resolving')
     expect(four).toHaveProperty('message', 'All workers exited before resolving')
+  })
+
+  it.todo('emits an error event when a worker errors')
+  it.todo('terminates puddle when workers fail in startup phase')
+  it.todo('rejects modules not exporting any function')
+  it.todo('rejects modules not exporting an object')
+  it.todo('throws before starting a worker which exposes reserved keys (like pool)')
+  it.todo('[Proposal] allows to manually respawn workers after error')
+  it.todo('[Proposal] allows to manually respawn workers after exit')
+  it.todo('[Proposal] calling respawn only spawns a worker once again, ignores all other calls')
+})
+
+describe('Termination', () => {
+  let worker = null
+
+  afterEach(() => {
+    worker.puddle.terminate()
+  })
+
+  it('terminates all workers', async () => {
+    worker = await spawn(basicWorkerPath, {
+      size: 2
+    })
+
+    const value = worker.asyncFn('value', 100)
+
+    worker.puddle.terminate()
+
+    const err = await value.catch(err => err)
+
+    expect(worker.pool).toHaveProperty('isTerminated', true)
+    expect(err).toHaveProperty('message', 'Worker thread exited before resolving')
+  })
+
+  it('cannot call another method after termination', async () => {
+    worker = await spawn(basicWorkerPath, {
+      size: 2
+    })
+
+    worker.puddle.terminate()
+
+    const err = await worker.asyncFn('value', 100).catch(err => err)
+
+    expect(err).toHaveProperty('message', 'Worker pool already terminated.')
   })
 })
 
