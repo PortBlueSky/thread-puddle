@@ -182,7 +182,18 @@ describe('Error Handling', () => {
     expect(four).toHaveProperty('message', 'All workers exited before resolving')
   })
 
-  it.todo('emits an error event when a worker errors')
+  it('emits an error event when a worker errors', async () => {
+    const fn = jest.fn()
+    worker.all.on('error', fn)
+
+    await worker.triggerUncaughtException()
+    await new Promise((resolve) => setTimeout(resolve, 500))
+
+    expect(fn).toHaveBeenCalledTimes(1)
+    expect(fn.mock.calls[0][0]).toHaveProperty('message', 'Worker failure')
+    expect(fn.mock.calls[0][0]).toHaveProperty('stack', expect.stringContaining('workers/basic.js'))
+  })
+
   it.todo('terminates puddle when workers fail in startup phase')
   it.todo('rejects modules not exporting any function')
   it.todo('rejects modules not exporting an object')

@@ -1,4 +1,5 @@
 const path = require('path')
+const EventEmitter = require('events')
 const { Worker, MessageChannel } = require('worker_threads')
 const debug = require('debug')('puddle:master')
 const { Transferable, withTransfer } = require('./Transferable')
@@ -19,6 +20,8 @@ async function createThreadPool (workerPath, {
   const workerCallbacks = {}
   let callbackCount = 0
   let isTerminated = false
+
+  const allWorkersTarget = new EventEmitter()
 
   const onReady = (worker) => {
     if (worker.callQueue.length > 0) {
@@ -79,6 +82,11 @@ async function createThreadPool (workerPath, {
 
     worker.on('error', (err) => {
       debug(`worker ${id} Error: %s`, err.message)
+
+      if (allWorkersTarget.listenerCount('error') > 0) {
+        allWorkersTarget.emit('error', err)
+      }
+
       if (!isTerminated) {
         for (const callbackId in workerCallbacks[id]) {
           workerCallbacks[id][callbackId].reject(err)
@@ -215,10 +223,14 @@ async function createThreadPool (workerPath, {
     get: () => isTerminated
   })
 
-  const allWorkersInterface = new Proxy({}, {
+  const allWorkersInterface = new Proxy(allWorkersTarget, {
     get: (target, key) => {
       if (key === 'then') {
         return undefined
+      }
+
+      if (['on', 'once'].includes(key)) {
+        return target[key].bind(target)
       }
 
       return (...args) => Promise.all(
