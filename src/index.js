@@ -50,6 +50,7 @@ async function createThreadPool (workerPath, {
 
     const worker = new Worker(workerProxyPath, workerOptions)
     const { port1, port2 } = new MessageChannel()
+    // TODO: Rename workerWithChannel to thread?
     const workerWithChannel = {
       id,
       worker,
@@ -102,6 +103,7 @@ async function createThreadPool (workerPath, {
     port2.on('message', (msg) => {
       switch (msg.action) {
         case 'resolve': {
+          debug('worker %d resolved callback %d', id, msg.callbackId)
           const { resolve } = workerCallbacks[id][msg.callbackId]
           delete workerCallbacks[id][msg.callbackId]
           onReady(workerWithChannel)
@@ -150,6 +152,7 @@ async function createThreadPool (workerPath, {
   threadIdOffset += size
 
   function callOnWorker (worker, key, args, resolve, reject) {
+    debug('calling %s on worker %d', key, worker.id)
     worker.busy = true
     const callbackId = callbackCount++
     workerCallbacks[worker.id][callbackId] = { resolve, reject }
@@ -178,11 +181,13 @@ async function createThreadPool (workerPath, {
 
     if (availableWorkers.length) {
       const worker = availableWorkers.shift()
+      debug('Resolving available worker %d', worker.id)
       return resolve(worker)
     }
 
     const workerRequest = { resolve, reject }
     workerRequests.push(workerRequest)
+    debug('Added worker request')
   })
 
   const terminate = () => {
@@ -218,6 +223,9 @@ async function createThreadPool (workerPath, {
 
     workerRequests.push(workerRequest)
   })))
+
+  // Note: This is just to satisfy some test which expect a certain call order,
+  // maybe this can be tested differently to remove the sort line, as it should not matter
   availableWorkers.sort((a, b) => a.id < b.id ? -1 : 1)
 
   debug('puddle filled, happy splashing!')
@@ -238,6 +246,7 @@ async function createThreadPool (workerPath, {
         return undefined
       }
 
+      // TODO: Emit events on worker.pool interface
       if (['on', 'once'].includes(key)) {
         return target[key].bind(target)
       }
@@ -255,6 +264,7 @@ async function createThreadPool (workerPath, {
   })
 
   return new Proxy({
+    // TODO: remove puddle interface to have only one way of doing things
     puddle: puddleInterface,
     pool: puddleInterface,
     all: allWorkersInterface

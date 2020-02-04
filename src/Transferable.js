@@ -4,7 +4,8 @@ function Transferable (obj, transferables) {
   }
 
   this.obj = obj
-  this.transferables = [].concat(transferables).map((value) => {
+  const transfers = transferables || obj
+  this.transferables = [].concat(transfers).map((value) => {
     if (value instanceof Uint8Array || value instanceof Uint16Array || value instanceof Uint32Array) {
       return value.buffer
     }

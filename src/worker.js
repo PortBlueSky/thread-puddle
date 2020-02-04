@@ -30,6 +30,7 @@ parentPort.once('message', (msg) => {
       return
     }
 
+    // TODO: expose id via { id } = require('thread-puddle') in worker
     worker.__ID__ = id
 
     port.on('message', async ({ action, key, args, callbackId }) => {
@@ -43,6 +44,8 @@ parentPort.once('message', (msg) => {
               throw new Error(`"${key}" is not a function in this worker thread`)
             }
             const result = await worker[key](...args)
+
+            debug('worker done with thread method %s', key)
 
             if (result instanceof Transferable) {
               port.postMessage({

@@ -109,6 +109,7 @@ describe('Basic Features', () => {
     ])
   })
 
+  it.todo('works with es6 modules')
   it.todo('can call a method on a specific worker directly')
   it.todo('emits an exit event when a worker exits')
 })
@@ -227,7 +228,7 @@ describe('Startup', () => {
     expect(startupError).toHaveProperty('message', 'Worker should export an object, got null')
   })
 
-  it.todo('throws before starting a worker which exposes reserved keys (like pool)')
+  it.todo('throws when exporting a promise from module')
 })
 
 describe('Termination', () => {
@@ -263,6 +264,23 @@ describe('Termination', () => {
 
     expect(err).toHaveProperty('message', 'Worker pool already terminated.')
   })
+})
+
+describe('Single Method Modules', () => {
+  let worker = null
+
+  beforeEach(async () => {
+    worker = await spawn(basicWorkerPath, {
+      size: 2
+    })
+  })
+
+  afterEach(() => {
+    worker.puddle.terminate()
+  })
+
+  it.todo('can call an exported method')
+  it.todo('can call a default exported method (es6 modules)')
 })
 
 describe('Alias', () => {
@@ -305,7 +323,7 @@ describe('Transferable', () => {
     expect(arr1).toEqual(new Uint8Array([1, 2, 3, 4]))
     expect(arr2).toEqual(new Uint8Array([2, 3, 4, 5]))
     expect(arr3).toEqual(new Uint8Array([1, 2, 3, 4]))
-    expect(err).toHaveProperty('message', 'Cannot perform %TypedArray%.prototype.map on a neutered ArrayBuffer')
+    expect(err).toHaveProperty('message', 'Cannot perform %TypedArray%.prototype.map on a detached ArrayBuffer')
   })
 
   it('wraps transferred UintArrays into instance', async () => {
@@ -352,13 +370,20 @@ describe('Transferable', () => {
       uint32Array.map(i => i + 1)
       expect(true).toBe(false)
     } catch (err) {
-      expect(err).toHaveProperty('message', 'Cannot perform %TypedArray%.prototype.map on a neutered ArrayBuffer')
+      expect(err).toHaveProperty('message', 'Cannot perform %TypedArray%.prototype.map on a detached ArrayBuffer')
     }
   })
 
   it('can transfer a buffer to worker, manipulate it and transfer it back', async () => {
     const uint8Array = new Uint8Array([1, 2, 3, 4])
     const result = await worker.manipulateAndTransfer(withTransfer(uint8Array, [uint8Array]))
+
+    expect(result).toEqual(new Uint8Array([2, 3, 4, 5]))
+  })
+
+  it('if no transferables are given, first argument is considered to be transferred', async () => {
+    const uint8Array = new Uint8Array([1, 2, 3, 4])
+    const result = await worker.manipulateAndTransfer(withTransfer(uint8Array))
 
     expect(result).toEqual(new Uint8Array([2, 3, 4, 5]))
   })
