@@ -3,6 +3,7 @@ const EventEmitter = require('events')
 const { Worker, MessageChannel } = require('worker_threads')
 const debug = require('debug')('puddle:master')
 const { Transferable, withTransfer } = require('./Transferable')
+const dynamicExports = require('./export-bridge')
 
 const workerProxyPath = path.resolve(__dirname, 'worker.js')
 let threadIdOffset = 1
@@ -292,5 +293,6 @@ async function createThreadPool (workerPath, {
 module.exports = {
   createPuddle: createThreadPool,
   spawn: createThreadPool,
-  withTransfer
+  withTransfer,
+  ...dynamicExports
 }

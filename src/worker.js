@@ -1,6 +1,7 @@
 const { parentPort } = require('worker_threads')
 const createDebug = require('debug')
 const { Transferable } = require('./Transferable')
+const dynamicExports = require('./export-bridge')
 
 parentPort.once('message', (msg) => {
   if (msg.action === 'init') {
@@ -8,6 +9,8 @@ parentPort.once('message', (msg) => {
     const debug = createDebug(`puddle:thread:${id}`)
     debug('Initializing worker thread...')
     let worker = null
+
+    dynamicExports.threadId = id
 
     try {
       worker = require(workerPath)
@@ -29,9 +32,6 @@ parentPort.once('message', (msg) => {
       port.postMessage({ action: 'startup-error', message, stack })
       return
     }
-
-    // TODO: expose id via { id } = require('thread-puddle') in worker
-    worker.__ID__ = id
 
     port.on('message', async ({ action, key, args, callbackId }) => {
       switch (action) {
