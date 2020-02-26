@@ -1,9 +1,9 @@
 // main.js
-const { createPuddle } = require('../../src')
+const { createThreadPool } = require('../../src')
 const path = require('path')
 
 async function start () {
-  const worker = await createPuddle(path.resolve(__dirname, 'worker.js'), {
+  const worker = await createThreadPool(path.resolve(__dirname, 'worker.js'), {
     size: 2
   })
 
@@ -11,7 +11,7 @@ async function start () {
 
   console.log(result) // -> "Hello!"
 
-  worker.puddle.terminate()
+  worker.pool.terminate()
 }
 
 start()

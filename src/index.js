@@ -234,9 +234,11 @@ async function createThreadPool (workerPath, {
   const puddleInterface = {
     terminate
   }
+  // TODO: Test cover
   Object.defineProperty(puddleInterface, 'size', {
     get: () => workers.length
   })
+  // TODO: Test cover
   Object.defineProperty(puddleInterface, 'isTerminated', {
     get: () => isTerminated
   })
@@ -293,6 +295,7 @@ async function createThreadPool (workerPath, {
 module.exports = {
   createPuddle: createThreadPool,
   spawn: createThreadPool,
+  createThreadPool,
   withTransfer,
   ...dynamicExports
 }

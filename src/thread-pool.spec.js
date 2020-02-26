@@ -112,6 +112,7 @@ describe('Basic Features', () => {
   it.todo('works with es6 modules')
   it.todo('can call a method on a specific worker directly')
   it.todo('emits an exit event when a worker exits')
+  it.todo('terminates the pool if all workers exited and did not error')
 })
 
 describe('Error Handling', () => {
