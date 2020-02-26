@@ -5,6 +5,8 @@
 # thread-puddle
 ## Turn any module into a worker thread
 
+[![Build Status](https://travis-ci.com/kommander/thread-puddle.svg?branch=master)](https://travis-ci.com/kommander/thread-puddle)
+
 A small library to pool Node.js [worker threads](https://nodejs.org/dist/latest-v13.x/docs/api/worker_threads.html), automatically exposing exported module methods using [Proxy Objects](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Proxy).
 
 ### Installation
