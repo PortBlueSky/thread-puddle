@@ -110,9 +110,14 @@ describe('Basic Features', () => {
   })
 
   it.todo('works with es6 modules')
+  it.todo('allows to call methods on the parent thread')
   it.todo('can call a method on a specific worker directly')
   it.todo('emits an exit event when a worker exits')
   it.todo('terminates the pool if all workers exited and did not error')
+})
+
+describe('Nested Threads', () => {
+  it.todo('allows to nest worker threads')
 })
 
 describe('Error Handling', () => {

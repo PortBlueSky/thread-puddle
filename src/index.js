@@ -1,6 +1,7 @@
 const path = require('path')
 const EventEmitter = require('events')
 const { Worker, MessageChannel } = require('worker_threads')
+// TODO: Adjust debug namespace when worker threads are nested
 const debug = require('debug')('puddle:master')
 const { Transferable, withTransfer } = require('./Transferable')
 const dynamicExports = require('./export-bridge')
@@ -18,6 +19,7 @@ async function createThreadPool (workerPath, {
   const workers = []
   const availableWorkers = []
   const workerRequests = []
+  // TODO: Use a Map
   const workerCallbacks = {}
   let callbackCount = 0
   let isTerminated = false

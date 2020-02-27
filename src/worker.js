@@ -6,6 +6,7 @@ const dynamicExports = require('./export-bridge')
 parentPort.once('message', (msg) => {
   if (msg.action === 'init') {
     const { workerPath, port, id } = msg
+    // TODO: Adjust debug namespace when worker threads are nested
     const debug = createDebug(`puddle:thread:${id}`)
     debug('Initializing worker thread...')
     let worker = null
