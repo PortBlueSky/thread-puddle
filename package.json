@@ -14,5 +14,13 @@
   },
   "dependencies": {
     "debug": "^4.1.1"
-  }
+  },
+  "keywords": [
+    "thread",
+    "pool",
+    "thread-pool",
+    "worker",
+    "worker-pool",
+    "proxy object"
+  ]
 }
