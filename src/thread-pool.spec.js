@@ -5,6 +5,8 @@ const debug = require('debug')
 
 debug.enabled('puddle')
 
+const majorVersion = parseInt(process.version.split('.')[0].match(/\d+/)[0])
+
 const basicWorkerPath = path.resolve(__dirname, '../test/workers/basic.js')
 const transferableWorkerPath = path.resolve(__dirname, '../test/workers/transferable.js')
 const startupFailWorkerPath = path.resolve(__dirname, '../test/workers/startup-fail.js')
@@ -329,7 +331,12 @@ describe('Transferable', () => {
     expect(arr1).toEqual(new Uint8Array([1, 2, 3, 4]))
     expect(arr2).toEqual(new Uint8Array([2, 3, 4, 5]))
     expect(arr3).toEqual(new Uint8Array([1, 2, 3, 4]))
-    expect(err).toHaveProperty('message', 'Cannot perform %TypedArray%.prototype.map on a detached ArrayBuffer')
+
+    if (majorVersion < 13) {
+      expect(err).toHaveProperty('message', 'Cannot perform %TypedArray%.prototype.map on a neutered ArrayBuffer')
+    } else {
+      expect(err).toHaveProperty('message', 'Cannot perform %TypedArray%.prototype.map on a detached ArrayBuffer')
+    }
   })
 
   it('wraps transferred UintArrays into instance', async () => {
@@ -376,7 +383,11 @@ describe('Transferable', () => {
       uint32Array.map(i => i + 1)
       expect(true).toBe(false)
     } catch (err) {
-      expect(err).toHaveProperty('message', 'Cannot perform %TypedArray%.prototype.map on a detached ArrayBuffer')
+      if (majorVersion < 13) {
+        expect(err).toHaveProperty('message', 'Cannot perform %TypedArray%.prototype.map on a neutered ArrayBuffer')
+      } else {
+        expect(err).toHaveProperty('message', 'Cannot perform %TypedArray%.prototype.map on a detached ArrayBuffer')
+      }
     }
   })
 
