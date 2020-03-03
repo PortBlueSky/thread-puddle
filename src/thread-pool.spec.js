@@ -2,12 +2,12 @@
 const path = require('path')
 const { createPuddle, spawn, withTransfer } = require('./index')
 const debug = require('debug')
+const majorVersion = require('./major-node-version')
 
 debug.enabled('puddle')
 
-const majorVersion = parseInt(process.version.split('.')[0].match(/\d+/)[0])
-
 const basicWorkerPath = path.resolve(__dirname, '../test/workers/basic.js')
+const es6WorkerPath = path.resolve(__dirname, '../test/workers/es6-module.mjs')
 const transferableWorkerPath = path.resolve(__dirname, '../test/workers/transferable.js')
 const startupFailWorkerPath = path.resolve(__dirname, '../test/workers/startup-fail.js')
 const noMethodWorkerPath = path.resolve(__dirname, '../test/workers/no-method.js')
@@ -117,6 +117,28 @@ describe('Basic Features', () => {
   it.todo('emits an exit event when a worker exits')
   it.todo('terminates the pool if all workers exited and did not error')
 })
+
+if (majorVersion >= 13) {
+  describe('ES6 Modules', () => {
+    let worker = null
+
+    beforeEach(async () => {
+      worker = await spawn(es6WorkerPath, {
+        size: 2
+      })
+    })
+
+    afterEach(() => {
+      worker.puddle.terminate()
+    })
+
+    it('can expose methods from worker module', async () => {
+      const value = await worker.fn('value')
+
+      expect(value).toEqual('got value')
+    })
+  })
+}
 
 describe('Nested Threads', () => {
   it.todo('allows to nest worker threads')

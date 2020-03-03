@@ -2,8 +2,9 @@ const { parentPort } = require('worker_threads')
 const createDebug = require('debug')
 const { Transferable } = require('./Transferable')
 const dynamicExports = require('./export-bridge')
+const majorVersion = require('./major-node-version')
 
-parentPort.once('message', (msg) => {
+parentPort.once('message', async (msg) => {
   if (msg.action === 'init') {
     const { workerPath, port, id } = msg
     // TODO: Adjust debug namespace when worker threads are nested
@@ -14,10 +15,26 @@ parentPort.once('message', (msg) => {
     dynamicExports.threadId = id
 
     try {
-      worker = require(workerPath)
+      let isCommonJS = false
 
-      if (!(worker instanceof Object)) {
-        throw new Error(`Worker should export an object, got ${worker}`)
+      if (majorVersion >= 13) {
+        worker = await import(workerPath)
+
+        const workerKeys = Object.keys(worker)
+        isCommonJS = workerKeys.length === 1 && workerKeys[0] === 'default'
+
+        if (isCommonJS) {
+          worker = worker.default
+        }
+      } else {
+        worker = require(workerPath)
+        isCommonJS = true
+      }
+
+      if (isCommonJS) {
+        if (!(worker instanceof Object)) {
+          throw new Error(`Worker should export an object, got ${worker}`)
+        }
       }
 
       let callables = 0
