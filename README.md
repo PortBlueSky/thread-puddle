@@ -134,6 +134,13 @@ Namespaces:
 - `puddle:thread:*` - logs for all threads only
 - `puddle:thread:[id]` - logs for a specific thread
 
+Nested Namespaces:
+
+- `puddle:parent:[id]:master`
+- `puddle:parent:[id]:thread:[id]`
+
+The debug method with the correct namespace is exported from the `thread-puddle` entry point.
+
 ---
 &copy; 2020 Sebastian Herrlinger
 
