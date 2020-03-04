@@ -7,7 +7,6 @@ const majorVersion = require('./major-node-version')
 debug.enabled('puddle')
 
 const basicWorkerPath = path.resolve(__dirname, '../test/workers/basic.js')
-const es6WorkerPath = path.resolve(__dirname, '../test/workers/es6-module.mjs')
 const transferableWorkerPath = path.resolve(__dirname, '../test/workers/transferable.js')
 const startupFailWorkerPath = path.resolve(__dirname, '../test/workers/startup-fail.js')
 const noMethodWorkerPath = path.resolve(__dirname, '../test/workers/no-method.js')
@@ -122,20 +121,28 @@ if (majorVersion >= 13) {
   describe('ES6 Modules', () => {
     let worker = null
 
-    beforeEach(async () => {
-      worker = await spawn(es6WorkerPath, {
-        size: 2
-      })
-    })
-
     afterEach(() => {
       worker.puddle.terminate()
     })
 
     it('can expose methods from worker module', async () => {
+      worker = await spawn(path.resolve(__dirname, '../test/workers/es6-module.mjs'), {
+        size: 2
+      })
+
       const value = await worker.fn('value')
 
       expect(value).toEqual('got value')
+    })
+
+    it('treats only default export as worker module', async () => {
+      worker = await spawn(path.resolve(__dirname, '../test/workers/es6-default.mjs'), {
+        size: 2
+      })
+
+      const value = await worker.fn2('value')
+
+      expect(value).toEqual('default value')
     })
   })
 }
