@@ -70,8 +70,8 @@ async function createThreadPool (workerPath, {
         const err = new Error('Worker thread exited before resolving')
         const callbacks = workerCallbacks.get(id)
 
-        for (const callbackId in callbacks) {
-          callbacks[callbackId].reject(err)
+        for (const { reject } of callbacks.values()) {
+          reject(err)
         }
       }
 
@@ -95,9 +95,10 @@ async function createThreadPool (workerPath, {
       if (!isTerminated) {
         const callbacks = workerCallbacks.get(id)
 
-        for (const callbackId in callbacks) {
-          callbacks[callbackId].reject(err)
+        for (const { reject } of callbacks.values()) {
+          reject(err)
         }
+
         workerWithChannel.error = err
 
         debug(`restarting worker ${id} after uncaught error`)
@@ -111,16 +112,16 @@ async function createThreadPool (workerPath, {
         case 'resolve': {
           debug('worker %d resolved callback %d', id, msg.callbackId)
           const callbacks = workerCallbacks.get(id)
-          const { resolve } = callbacks[msg.callbackId]
-          delete callbacks[msg.callbackId]
+          const { resolve } = callbacks.get(msg.callbackId)
+          callbacks.delete(msg.callbackId)
           onReady(workerWithChannel)
           resolve(msg.result)
           break
         }
         case 'reject': {
           const callbacks = workerCallbacks.get(id)
-          const { reject } = callbacks[msg.callbackId]
-          delete callbacks[msg.callbackId]
+          const { reject } = callbacks.get(msg.callbackId)
+          callbacks.delete(msg.callbackId)
           const err = new Error(msg.message)
           err.stack = msg.stack
           onReady(workerWithChannel)
@@ -146,7 +147,7 @@ async function createThreadPool (workerPath, {
       }
     })
 
-    workerCallbacks.set(id, {})
+    workerCallbacks.set(id, new Map())
 
     workers.push(workerWithChannel)
   }
@@ -163,7 +164,7 @@ async function createThreadPool (workerPath, {
     debug('calling %s on worker %d', key, worker.id)
     worker.busy = true
     const callbackId = callbackCount++
-    workerCallbacks.get(worker.id)[callbackId] = { resolve, reject }
+    workerCallbacks.get(worker.id).set(callbackId, { resolve, reject })
 
     const transferables = []
     const iteratedArgs = args.map((arg) => {
