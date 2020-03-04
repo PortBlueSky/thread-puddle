@@ -1,7 +1,6 @@
 const path = require('path')
 const EventEmitter = require('events')
 const { Worker, MessageChannel, isMainThread } = require('worker_threads')
-// TODO: Adjust debug namespace when worker threads are nested
 const createDebug = require('debug')
 const { Transferable, withTransfer } = require('./Transferable')
 const { threadId, debug: dynamicDebug } = require('./export-bridge')
@@ -88,9 +87,12 @@ async function createThreadPool (workerPath, {
         }
       }
 
+      // TODO: Ensure thread is not removed after being created from error
       removeThread(thread)
 
       if (threads.length === 0) {
+        terminate()
+
         const err = new Error('All workers exited before resolving')
         for (const workerRequest of threadRequests) {
           workerRequest.reject(err)
@@ -105,6 +107,8 @@ async function createThreadPool (workerPath, {
         puddleInterface.emit('error', err)
       }
 
+      // TODO: Reject only the call that errored,
+      // -> recall all other
       if (!isTerminated) {
         const callbacks = threadCallbacks.get(id)
 
@@ -114,6 +118,7 @@ async function createThreadPool (workerPath, {
 
         thread.error = err
 
+        // TODO: Make auto respawn optional
         debug(`restarting worker ${id} after uncaught error`)
         createThread(id)
       }

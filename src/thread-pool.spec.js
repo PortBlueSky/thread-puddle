@@ -136,9 +136,16 @@ describe('Basic Features', () => {
     expect(fn.mock.calls[0][1]).toEqual(expect.any(Number))
   })
 
+  it('terminates the pool if all workers exited and did not error', async () => {
+    await worker.triggerExit()
+    await worker.triggerExit()
+    await new Promise((resolve) => setTimeout(resolve, 500))
+
+    expect(worker.pool).toHaveProperty('isTerminated', true)
+  })
+
   it.todo('allows to call methods on the parent thread')
   it.todo('can call a method on a specific worker directly')
-  it.todo('terminates the pool if all workers exited and did not error')
 })
 
 if (majorVersion >= 13) {
@@ -303,8 +310,6 @@ describe('Startup', () => {
 
     expect(startupError).toHaveProperty('message', 'Worker should export an object, got null')
   })
-
-  it.todo('throws when exporting a promise from module')
 })
 
 describe('Termination', () => {
