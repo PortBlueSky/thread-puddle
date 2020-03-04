@@ -28,6 +28,7 @@ describe('Basic Features', () => {
 
   afterEach(() => {
     worker.pool.terminate()
+    expect(worker.pool.isTerminated).toEqual(true)
   })
 
   it('can expose methods from worker module', async () => {
@@ -108,6 +109,12 @@ describe('Basic Features', () => {
         'got value 16'
       ]
     ])
+  })
+
+  it('exposes the pool size as readonly', () => {
+    expect(worker.pool.size).toEqual(2)
+    worker.pool.size = 4
+    expect(worker.pool.size).toEqual(2)
   })
 
   it.todo('allows to call methods on the parent thread')
