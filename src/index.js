@@ -16,45 +16,44 @@ async function createThreadPool (workerPath, {
 } = {}) {
   debug('carving out a puddle...')
 
-  const workers = []
-  const availableWorkers = []
-  const workerRequests = []
-  const workerCallbacks = new Map()
+  const threads = []
+  const availableThreads = []
+  const threadRequests = []
+  const threadCallbacks = new Map()
   let callbackCount = 0
   let isTerminated = false
 
   const allWorkersTarget = {}
   const puddleInterface = new EventEmitter()
 
-  const onReady = (worker) => {
-    if (worker.callQueue.length > 0) {
-      const waitingCall = worker.callQueue.shift()
-      callOnWorker(worker, ...waitingCall)
+  const onReady = (thread) => {
+    if (thread.callQueue.length > 0) {
+      const waitingCall = thread.callQueue.shift()
+      callOnThread(thread, ...waitingCall)
       return
     }
 
-    if (workerRequests.length > 0) {
-      const request = workerRequests.shift()
-      request.resolve(worker)
+    if (threadRequests.length > 0) {
+      const request = threadRequests.shift()
+      request.resolve(thread)
       return
     }
 
-    worker.busy = false
-    availableWorkers.push(worker)
+    thread.busy = false
+    availableThreads.push(thread)
   }
 
-  const removeWorker = ({ id }) => {
-    workers.splice(workers.findIndex(worker => (worker.id === id)), 1)
-    availableWorkers.splice(availableWorkers.findIndex(worker => (worker.id === id)), 1)
+  const removeThread = ({ id }) => {
+    threads.splice(threads.findIndex(thread => (thread.id === id)), 1)
+    availableThreads.splice(availableThreads.findIndex(thread => (thread.id === id)), 1)
   }
 
-  const createWorker = (id) => {
+  const createThread = (id) => {
     debug('creating worker thread %s', id)
 
     const worker = new Worker(workerProxyPath, workerOptions)
     const { port1, port2 } = new MessageChannel()
-    // TODO: Rename workerWithChannel to thread?
-    const workerWithChannel = {
+    const thread = {
       id,
       worker,
       port: port2,
@@ -66,20 +65,20 @@ async function createThreadPool (workerPath, {
     worker.on('exit', (code) => {
       debug('worker %d exited with code %d', id, code)
 
-      if (!workerWithChannel.error) {
+      if (!thread.error) {
         const err = new Error('Worker thread exited before resolving')
-        const callbacks = workerCallbacks.get(id)
+        const callbacks = threadCallbacks.get(id)
 
         for (const { reject } of callbacks.values()) {
           reject(err)
         }
       }
 
-      removeWorker(workerWithChannel)
+      removeThread(thread)
 
-      if (workers.length === 0) {
+      if (threads.length === 0) {
         const err = new Error('All workers exited before resolving')
-        for (const workerRequest of workerRequests) {
+        for (const workerRequest of threadRequests) {
           workerRequest.reject(err)
         }
       }
@@ -93,16 +92,16 @@ async function createThreadPool (workerPath, {
       }
 
       if (!isTerminated) {
-        const callbacks = workerCallbacks.get(id)
+        const callbacks = threadCallbacks.get(id)
 
         for (const { reject } of callbacks.values()) {
           reject(err)
         }
 
-        workerWithChannel.error = err
+        thread.error = err
 
         debug(`restarting worker ${id} after uncaught error`)
-        createWorker(id)
+        createThread(id)
       }
     })
 
@@ -111,30 +110,30 @@ async function createThreadPool (workerPath, {
       switch (msg.action) {
         case 'resolve': {
           debug('worker %d resolved callback %d', id, msg.callbackId)
-          const callbacks = workerCallbacks.get(id)
+          const callbacks = threadCallbacks.get(id)
           const { resolve } = callbacks.get(msg.callbackId)
           callbacks.delete(msg.callbackId)
-          onReady(workerWithChannel)
+          onReady(thread)
           resolve(msg.result)
           break
         }
         case 'reject': {
-          const callbacks = workerCallbacks.get(id)
+          const callbacks = threadCallbacks.get(id)
           const { reject } = callbacks.get(msg.callbackId)
           callbacks.delete(msg.callbackId)
           const err = new Error(msg.message)
           err.stack = msg.stack
-          onReady(workerWithChannel)
+          onReady(thread)
           reject(err)
           break
         }
         case 'ready': {
-          onReady(workerWithChannel)
+          onReady(thread)
           break
         }
         case 'startup-error': {
-          if (workerRequests.length > 0) {
-            const request = workerRequests.shift()
+          if (threadRequests.length > 0) {
+            const request = threadRequests.shift()
             const err = new Error(msg.message)
             err.stack = msg.stack
             request.reject(err)
@@ -147,24 +146,24 @@ async function createThreadPool (workerPath, {
       }
     })
 
-    workerCallbacks.set(id, new Map())
+    threadCallbacks.set(id, new Map())
 
-    workers.push(workerWithChannel)
+    threads.push(thread)
   }
 
   debug('filling puddle with thread liquid...')
 
   for (let i = threadIdOffset; i < size + threadIdOffset; i += 1) {
-    createWorker(i)
+    createThread(i)
   }
 
   threadIdOffset += size
 
-  function callOnWorker (worker, key, args, resolve, reject) {
-    debug('calling %s on worker %d', key, worker.id)
-    worker.busy = true
+  function callOnThread (thread, key, args, resolve, reject) {
+    debug('calling %s on worker %d', key, thread.id)
+    thread.busy = true
     const callbackId = callbackCount++
-    workerCallbacks.get(worker.id).set(callbackId, { resolve, reject })
+    threadCallbacks.get(thread.id).set(callbackId, { resolve, reject })
 
     const transferables = []
     const iteratedArgs = args.map((arg) => {
@@ -175,7 +174,7 @@ async function createThreadPool (workerPath, {
       return arg
     })
 
-    worker.port.postMessage({
+    thread.port.postMessage({
       action: 'call',
       key,
       callbackId,
@@ -183,19 +182,19 @@ async function createThreadPool (workerPath, {
     }, transferables)
   }
 
-  const getAvailableWorker = () => new Promise((resolve, reject) => {
+  const getAvailableThread = () => new Promise((resolve, reject) => {
     if (isTerminated) {
       return reject(new Error('Worker pool already terminated.'))
     }
 
-    if (availableWorkers.length > 0) {
-      const worker = availableWorkers.shift()
-      debug('Resolving available worker %d', worker.id)
-      return resolve(worker)
+    if (availableThreads.length > 0) {
+      const thread = availableThreads.shift()
+      debug('Resolving available worker %d', thread.id)
+      return resolve(thread)
     }
 
-    const workerRequest = { resolve, reject }
-    workerRequests.push(workerRequest)
+    const threadRequest = { resolve, reject }
+    threadRequests.push(threadRequest)
     debug('Added worker request')
   })
 
@@ -203,26 +202,26 @@ async function createThreadPool (workerPath, {
     debug('pulling the plug on the puddle...')
 
     isTerminated = true
-    for (const pWorker of workers) {
-      pWorker.worker.terminate()
+    for (const thread of threads) {
+      thread.worker.terminate()
     }
   }
 
-  await Promise.all(workers.map((worker) => new Promise((resolve, reject) => {
+  await Promise.all(threads.map((thread) => new Promise((resolve, reject) => {
     const timeout = setTimeout(() => {
       terminate()
-      reject(new Error(`Worker ${worker.id} initialization timed out`))
+      reject(new Error(`Worker ${thread.id} initialization timed out`))
     }, startupTimeout)
-    const workerRequest = {
-      resolve: (worker) => {
-        debug('worker %d ready', worker.id)
+    const threadRequest = {
+      resolve: (thread) => {
+        debug('worker %d ready', thread.id)
 
         clearTimeout(timeout)
-        availableWorkers.push(worker)
+        availableThreads.push(thread)
         resolve()
       },
       reject: (err) => {
-        debug('worker %d startup failed', worker.id)
+        debug('worker %d startup failed', thread.id)
 
         clearTimeout(timeout)
         terminate()
@@ -230,7 +229,7 @@ async function createThreadPool (workerPath, {
       }
     }
 
-    workerRequests.push(workerRequest)
+    threadRequests.push(threadRequest)
   })))
 
   debug('puddle filled, happy splashing!')
@@ -240,7 +239,7 @@ async function createThreadPool (workerPath, {
   })
   Object.defineProperties(puddleInterface, {
     size: {
-      get: () => workers.length,
+      get: () => threads.length,
       writeable: false
     },
     isTerminated: {
@@ -256,12 +255,12 @@ async function createThreadPool (workerPath, {
       }
 
       return (...args) => Promise.all(
-        workers.map(worker => new Promise((resolve, reject) => {
-          if (!worker.busy) {
-            callOnWorker(worker, key, args, resolve, reject)
+        threads.map(thread => new Promise((resolve, reject) => {
+          if (!thread.busy) {
+            callOnThread(thread, key, args, resolve, reject)
             return
           }
-          worker.callQueue.push({ key, args, resolve, reject })
+          thread.callQueue.push({ key, args, resolve, reject })
         }))
       )
     }
@@ -278,13 +277,13 @@ async function createThreadPool (workerPath, {
         return undefined
       }
 
-      if (['puddle', 'pool', 'all'].includes(key)) {
+      if (['pool', 'all'].includes(key)) {
         return target[key]
       }
 
       return (...args) => new Promise((resolve, reject) => {
-        getAvailableWorker()
-          .then(worker => callOnWorker(worker, key, args, resolve, reject))
+        getAvailableThread()
+          .then(thread => callOnThread(thread, key, args, resolve, reject))
           .catch(err => reject(err))
       })
     }
