@@ -6,13 +6,19 @@ const majorVersion = require('./major-node-version')
 
 parentPort.once('message', async (msg) => {
   if (msg.action === 'init') {
-    const { workerPath, port, id } = msg
-    // TODO: Adjust debug namespace when worker threads are nested
-    const debug = createDebug(`puddle:thread:${id}`)
+    const { workerPath, port, id, parentId } = msg
+
+    let debug = null
+    if (parentId) {
+      debug = createDebug(`puddle:parent:${parentId}:thread:${id}`)
+    } else {
+      debug = createDebug(`puddle:thread:${id}`)
+    }
     debug('Initializing worker thread...')
     let worker = null
 
     dynamicExports.threadId = id
+    dynamicExports.debug = debug
 
     try {
       let isCommonJS = false

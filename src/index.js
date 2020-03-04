@@ -1,13 +1,23 @@
 const path = require('path')
 const EventEmitter = require('events')
-const { Worker, MessageChannel } = require('worker_threads')
+const { Worker, MessageChannel, isMainThread } = require('worker_threads')
 // TODO: Adjust debug namespace when worker threads are nested
-const debug = require('debug')('puddle:master')
+const createDebug = require('debug')
 const { Transferable, withTransfer } = require('./Transferable')
-const dynamicExports = require('./export-bridge')
+const { threadId, debug: dynamicDebug } = require('./export-bridge')
+
+let debug = null
+let exportedDebug = null
+if (isMainThread) {
+  debug = createDebug('puddle:master')
+  exportedDebug = debug
+} else {
+  debug = createDebug(`puddle:parent:${threadId}:master`)
+  exportedDebug = dynamicDebug
+}
 
 const workerProxyPath = path.resolve(__dirname, 'worker.js')
-let threadIdOffset = 1
+global.__puddle__threadIdOffset = 1
 
 async function createThreadPool (workerPath, {
   size = 1,
@@ -105,7 +115,13 @@ async function createThreadPool (workerPath, {
       }
     })
 
-    worker.postMessage({ action: 'init', workerPath, port: port1, id }, [port1])
+    worker.postMessage({
+      action: 'init',
+      workerPath,
+      port: port1,
+      id,
+      parentId: threadId
+    }, [port1])
     port2.on('message', (msg) => {
       switch (msg.action) {
         case 'resolve': {
@@ -153,11 +169,14 @@ async function createThreadPool (workerPath, {
 
   debug('filling puddle with thread liquid...')
 
-  for (let i = threadIdOffset; i < size + threadIdOffset; i += 1) {
+  const idStart = global.__puddle__threadIdOffset
+  const idEnd = idStart + size
+
+  for (let i = idStart; i < idEnd; i += 1) {
     createThread(i)
   }
 
-  threadIdOffset += size
+  global.__puddle__threadIdOffset += size
 
   function callOnThread (thread, key, args, resolve, reject) {
     debug('calling %s on worker %d', key, thread.id)
@@ -295,5 +314,6 @@ module.exports = {
   spawn: createThreadPool,
   createThreadPool,
   withTransfer,
-  ...dynamicExports
+  threadId,
+  debug: exportedDebug
 }

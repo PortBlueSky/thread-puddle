@@ -162,7 +162,22 @@ if (majorVersion >= 13) {
 }
 
 describe('Nested Threads', () => {
-  it.todo('allows to nest worker threads')
+  let worker = null
+
+  beforeEach(async () => {
+    worker = await createPuddle(path.resolve(__dirname, '../test/workers/nest.js'))
+    await worker.setup()
+  })
+
+  afterEach(() => {
+    worker.pool.terminate()
+  })
+
+  it('allows to nest worker threads', async () => {
+    const result = await worker.callNested('value')
+
+    expect(result).toEqual('nested value')
+  })
 })
 
 describe('Error Handling', () => {

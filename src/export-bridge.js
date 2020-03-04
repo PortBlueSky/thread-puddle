@@ -1,3 +1,4 @@
 module.exports = {
-  threadId: null
+  threadId: null,
+  debug: null
 }
