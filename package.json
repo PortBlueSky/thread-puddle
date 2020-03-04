@@ -1,7 +1,7 @@
 {
   "name": "thread-puddle",
   "description": "Turn any module into a worker thread",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "main": "src/index.js",
   "author": "Sebastian Herrlinger <hasta84@gmail.com>",
   "license": "MIT",
