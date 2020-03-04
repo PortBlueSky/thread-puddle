@@ -19,8 +19,7 @@ async function createThreadPool (workerPath, {
   const workers = []
   const availableWorkers = []
   const workerRequests = []
-  // TODO: Use a Map
-  const workerCallbacks = {}
+  const workerCallbacks = new Map()
   let callbackCount = 0
   let isTerminated = false
 
@@ -69,9 +68,10 @@ async function createThreadPool (workerPath, {
 
       if (!workerWithChannel.error) {
         const err = new Error('Worker thread exited before resolving')
+        const callbacks = workerCallbacks.get(id)
 
-        for (const callbackId in workerCallbacks[id]) {
-          workerCallbacks[id][callbackId].reject(err)
+        for (const callbackId in callbacks) {
+          callbacks[callbackId].reject(err)
         }
       }
 
@@ -93,8 +93,10 @@ async function createThreadPool (workerPath, {
       }
 
       if (!isTerminated) {
-        for (const callbackId in workerCallbacks[id]) {
-          workerCallbacks[id][callbackId].reject(err)
+        const callbacks = workerCallbacks.get(id)
+
+        for (const callbackId in callbacks) {
+          callbacks[callbackId].reject(err)
         }
         workerWithChannel.error = err
 
@@ -108,15 +110,17 @@ async function createThreadPool (workerPath, {
       switch (msg.action) {
         case 'resolve': {
           debug('worker %d resolved callback %d', id, msg.callbackId)
-          const { resolve } = workerCallbacks[id][msg.callbackId]
-          delete workerCallbacks[id][msg.callbackId]
+          const callbacks = workerCallbacks.get(id)
+          const { resolve } = callbacks[msg.callbackId]
+          delete callbacks[msg.callbackId]
           onReady(workerWithChannel)
           resolve(msg.result)
           break
         }
         case 'reject': {
-          const { reject } = workerCallbacks[id][msg.callbackId]
-          delete workerCallbacks[id][msg.callbackId]
+          const callbacks = workerCallbacks.get(id)
+          const { reject } = callbacks[msg.callbackId]
+          delete callbacks[msg.callbackId]
           const err = new Error(msg.message)
           err.stack = msg.stack
           onReady(workerWithChannel)
@@ -142,7 +146,7 @@ async function createThreadPool (workerPath, {
       }
     })
 
-    workerCallbacks[id] = {}
+    workerCallbacks.set(id, {})
 
     workers.push(workerWithChannel)
   }
@@ -159,7 +163,7 @@ async function createThreadPool (workerPath, {
     debug('calling %s on worker %d', key, worker.id)
     worker.busy = true
     const callbackId = callbackCount++
-    workerCallbacks[worker.id][callbackId] = { resolve, reject }
+    workerCallbacks.get(worker.id)[callbackId] = { resolve, reject }
 
     const transferables = []
     const iteratedArgs = args.map((arg) => {
