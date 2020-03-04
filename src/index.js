@@ -33,7 +33,7 @@ async function createThreadPool (workerPath, {
       return
     }
 
-    if (workerRequests.length) {
+    if (workerRequests.length > 0) {
       const request = workerRequests.shift()
       request.resolve(worker)
       return
@@ -133,7 +133,7 @@ async function createThreadPool (workerPath, {
           break
         }
         case 'startup-error': {
-          if (workerRequests.length) {
+          if (workerRequests.length > 0) {
             const request = workerRequests.shift()
             const err = new Error(msg.message)
             err.stack = msg.stack
@@ -188,7 +188,7 @@ async function createThreadPool (workerPath, {
       return reject(new Error('Worker pool already terminated.'))
     }
 
-    if (availableWorkers.length) {
+    if (availableWorkers.length > 0) {
       const worker = availableWorkers.shift()
       debug('Resolving available worker %d', worker.id)
       return resolve(worker)
@@ -233,20 +233,20 @@ async function createThreadPool (workerPath, {
     workerRequests.push(workerRequest)
   })))
 
-  // Note: This is just to satisfy some test which expect a certain call order,
-  // maybe this can be tested differently to remove the sort line, as it should not matter
-  availableWorkers.sort((a, b) => a.id < b.id ? -1 : 1)
-
   debug('puddle filled, happy splashing!')
 
   Object.assign(puddleInterface, {
     terminate
   })
-  Object.defineProperty(puddleInterface, 'size', {
-    get: () => workers.length
-  })
-  Object.defineProperty(puddleInterface, 'isTerminated', {
-    get: () => isTerminated
+  Object.defineProperties(puddleInterface, {
+    size: {
+      get: () => workers.length,
+      writeable: false
+    },
+    isTerminated: {
+      get: () => isTerminated,
+      writeable: false
+    }
   })
 
   const allWorkersInterface = new Proxy(allWorkersTarget, {

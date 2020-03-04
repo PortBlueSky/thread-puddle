@@ -57,6 +57,7 @@ parentPort.once('message', async (msg) => {
           debug('calling worker thread method %s', key)
 
           try {
+            // TODO: ensure hasOwnProperty
             if (typeof worker[key] !== 'function') {
               debug('%s is not a function', key)
               throw new Error(`"${key}" is not a function in this worker thread`)

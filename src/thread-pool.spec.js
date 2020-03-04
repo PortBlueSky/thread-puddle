@@ -12,6 +12,15 @@ const startupFailWorkerPath = path.resolve(__dirname, '../test/workers/startup-f
 const noMethodWorkerPath = path.resolve(__dirname, '../test/workers/no-method.js')
 const noObjectWorkerPath = path.resolve(__dirname, '../test/workers/no-object.js')
 
+const countBy = (list) => list.reduce((acc, key) => {
+  if (acc[key]) {
+    acc[key] += 1
+    return acc
+  }
+  acc[key] = 1
+  return acc
+}, {})
+
 describe('Basic Features', () => {
   let worker = null
 
@@ -66,12 +75,11 @@ describe('Basic Features', () => {
     const value3 = await worker.fnWorkerNum('value')
     const value4 = await worker.fnWorkerNum('value')
 
-    expect([value1, value2, value3, value4]).toEqual([
-      'got value 9',
-      'got value 10',
-      'got value 9',
-      'got value 10'
-    ])
+    const counts = countBy([value1, value2, value3, value4])
+    expect(counts).toEqual({
+      'got value 9': 2,
+      'got value 10': 2
+    })
   })
 
   it('always only calls one method per worker', async () => {
