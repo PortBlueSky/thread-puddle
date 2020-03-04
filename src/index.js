@@ -269,8 +269,6 @@ async function createThreadPool (workerPath, {
   })
 
   return new Proxy({
-    // TODO: remove puddle interface to have only one way of doing things
-    puddle: puddleInterface,
     pool: puddleInterface,
     all: allWorkersInterface
   }, {

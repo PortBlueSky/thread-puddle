@@ -27,7 +27,7 @@ describe('Basic Features', () => {
   })
 
   afterEach(() => {
-    worker.puddle.terminate()
+    worker.pool.terminate()
   })
 
   it('can expose methods from worker module', async () => {
@@ -121,7 +121,7 @@ if (majorVersion >= 13) {
     let worker = null
 
     afterEach(() => {
-      worker.puddle.terminate()
+      worker.pool.terminate()
     })
 
     it('can expose methods from worker module', async () => {
@@ -160,7 +160,7 @@ describe('Error Handling', () => {
   })
 
   afterEach(() => {
-    worker.puddle.terminate()
+    worker.pool.terminate()
   })
 
   it('forwards worker method errors with worker stack trace', async () => {
@@ -187,7 +187,7 @@ describe('Error Handling', () => {
     await worker.triggerUncaughtException()
     await new Promise((resolve) => setTimeout(resolve, 500))
 
-    expect(worker.puddle).toHaveProperty('size', 2)
+    expect(worker.pool).toHaveProperty('size', 2)
   })
 
   it('rejects open method calls when a worker crashes', async () => {
@@ -271,7 +271,7 @@ describe('Termination', () => {
   let worker = null
 
   afterEach(() => {
-    worker.puddle.terminate()
+    worker.pool.terminate()
   })
 
   it('terminates all workers', async () => {
@@ -281,7 +281,7 @@ describe('Termination', () => {
 
     const value = worker.asyncFn('value', 100)
 
-    worker.puddle.terminate()
+    worker.pool.terminate()
 
     const err = await value.catch(err => err)
 
@@ -294,7 +294,7 @@ describe('Termination', () => {
       size: 2
     })
 
-    worker.puddle.terminate()
+    worker.pool.terminate()
 
     const err = await worker.asyncFn('value', 100).catch(err => err)
 
@@ -312,7 +312,7 @@ describe('Single Method Modules', () => {
   })
 
   afterEach(() => {
-    worker.puddle.terminate()
+    worker.pool.terminate()
   })
 
   it.todo('can call an exported method')
@@ -329,7 +329,7 @@ describe('Alias', () => {
   })
 
   afterEach(() => {
-    worker.puddle.terminate()
+    worker.pool.terminate()
   })
 
   it('has a spawn method to create a worker thread pool', async () => {
@@ -347,7 +347,7 @@ describe('Transferable', () => {
   })
 
   afterEach(() => {
-    worker.puddle.terminate()
+    worker.pool.terminate()
   })
 
   it('can transfer a return value from a worker', async () => {
