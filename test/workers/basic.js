@@ -36,5 +36,8 @@ module.exports = {
   },
   exitWorker: async (timeout) => new Promise(resolve => setTimeout(() => {
     process.exit()
-  }, timeout))
+  }, timeout)),
+  triggerExit: () => {
+    setTimeout(() => process.exit(), 25)
+  }
 }

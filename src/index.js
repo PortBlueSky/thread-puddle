@@ -75,6 +75,10 @@ async function createThreadPool (workerPath, {
     worker.on('exit', (code) => {
       debug('worker %d exited with code %d', id, code)
 
+      if (puddleInterface.listenerCount('exit') > 0) {
+        puddleInterface.emit('exit', code, id)
+      }
+
       if (!thread.error) {
         const err = new Error('Worker thread exited before resolving')
         const callbacks = threadCallbacks.get(id)

@@ -7,3 +7,4 @@
 - Loads ECMAScript Modules (ES6 Modules) as workers for node version >= 13.
 - Has now only one way to access the pool interface: `workerProxy.pool`
 - Emits worker events on the `workerProxy.pool` interface
+- Emits an `exit` event when a worker exits, `code` and `threadId`

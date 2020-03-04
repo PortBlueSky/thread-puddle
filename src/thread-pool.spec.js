@@ -125,9 +125,19 @@ describe('Basic Features', () => {
     expect(worker.pool.size).toEqual(2)
   })
 
+  it('emits an exit event when a worker exits', async () => {
+    const fn = jest.fn()
+    worker.pool.on('exit', fn)
+    await worker.triggerExit()
+    await new Promise((resolve) => setTimeout(resolve, 500))
+
+    expect(fn).toHaveBeenCalledTimes(1)
+    expect(fn.mock.calls[0][0]).toEqual(0)
+    expect(fn.mock.calls[0][1]).toEqual(expect.any(Number))
+  })
+
   it.todo('allows to call methods on the parent thread')
   it.todo('can call a method on a specific worker directly')
-  it.todo('emits an exit event when a worker exits')
   it.todo('terminates the pool if all workers exited and did not error')
 })
 

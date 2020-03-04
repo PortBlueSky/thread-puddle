@@ -123,6 +123,10 @@ module.exports = {
 
 Forwards errors that are emitted for a specific worker in the pool. When a worker thread errors, it is terminated. The pool will spawn another worker, unless it is terminated.
 
+#### `exit`
+
+Forwards exit events that are emitted for a specific worker in the pool, addind the `threadId` as second argument.
+
 ## Debug
 
 Thread Puddle has only one dependency: [`debug`](https://www.npmjs.com/package/debug)
