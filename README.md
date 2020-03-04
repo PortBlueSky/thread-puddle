@@ -117,6 +117,12 @@ module.exports = {
 }
 ```
 
+### Pool Events
+
+#### `error`
+
+Forwards errors that are emitted for a specific worker in the pool. When a worker thread errors, it is terminated. The pool will spawn another worker, unless it is terminated.
+
 ## Debug
 
 Thread Puddle has only one dependency: [`debug`](https://www.npmjs.com/package/debug)

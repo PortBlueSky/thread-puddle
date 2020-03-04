@@ -231,7 +231,7 @@ describe('Error Handling', () => {
 
   it('emits an error event when a worker errors', async () => {
     const fn = jest.fn()
-    worker.all.on('error', fn)
+    worker.pool.on('error', fn)
 
     await worker.triggerUncaughtException()
     await new Promise((resolve) => setTimeout(resolve, 500))

@@ -24,7 +24,8 @@ async function createThreadPool (workerPath, {
   let callbackCount = 0
   let isTerminated = false
 
-  const allWorkersTarget = new EventEmitter()
+  const allWorkersTarget = {}
+  const puddleInterface = new EventEmitter()
 
   const onReady = (worker) => {
     if (worker.callQueue.length > 0) {
@@ -87,8 +88,8 @@ async function createThreadPool (workerPath, {
     worker.on('error', (err) => {
       debug(`worker ${id} Error: %s`, err.message)
 
-      if (allWorkersTarget.listenerCount('error') > 0) {
-        allWorkersTarget.emit('error', err)
+      if (puddleInterface.listenerCount('error') > 0) {
+        puddleInterface.emit('error', err)
       }
 
       if (!isTerminated) {
@@ -233,9 +234,9 @@ async function createThreadPool (workerPath, {
 
   debug('puddle filled, happy splashing!')
 
-  const puddleInterface = {
+  Object.assign(puddleInterface, {
     terminate
-  }
+  })
   Object.defineProperty(puddleInterface, 'size', {
     get: () => workers.length
   })
@@ -247,11 +248,6 @@ async function createThreadPool (workerPath, {
     get: (target, key) => {
       if (key === 'then') {
         return undefined
-      }
-
-      // TODO: Emit events on worker.pool interface
-      if (['on', 'once'].includes(key)) {
-        return target[key].bind(target)
       }
 
       return (...args) => Promise.all(
