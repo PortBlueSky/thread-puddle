@@ -7,7 +7,7 @@
   "license": "MIT",
   "devDependencies": {
     "jest": "^25.1.0",
-    "standard": "^14.3.1"
+    "standard": "^14.3.3"
   },
   "scripts": {
     "test": "jest"
@@ -15,10 +15,10 @@
   "dependencies": {
     "debug": "^4.1.1"
   },
-  "engines" : { 
-    "node" : ">=12" 
+  "engines": {
+    "node": ">=12"
   },
-  "engineStrict" : true,
+  "engineStrict": true,
   "keywords": [
     "thread",
     "pool",
