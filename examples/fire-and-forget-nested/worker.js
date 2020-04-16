@@ -6,7 +6,7 @@ module.exports = {
     const userModule = await createThreadPool(filePath)
 
     await userModule.interface1()
-    await userModule.userMethod(...args)
+    await userModule[methodName](...args)
     await userModule.interface2()
 
     userModule.pool.terminate()
