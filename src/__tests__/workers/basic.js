@@ -1,5 +1,5 @@
 const { workerData } = require('worker_threads')
-const { threadId } = require('../../src')
+const { threadId } = require('../../')
 let currentlyHandling = false
 
 module.exports = {

@@ -31,7 +31,7 @@ parentPort.once('message', async (msg) => {
         worker = await import(workerPath)
 
         if (!worker) {
-          throw new Error('Workes does not expose a mountable object')
+          throw new Error('Worker does not expose a mountable object')
         }
 
         const workerKeys = Object.keys(worker)

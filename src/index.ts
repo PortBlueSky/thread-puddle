@@ -82,11 +82,11 @@ export interface PoolInterface extends EventEmitter {
   isTerminated: boolean;
 }
 
-export async function createThreadPool<WorkerType extends BaseWorkerType> (workerPath: string, {
+export async function createThreadPool<WorkerType extends object> (workerPath: string, {
   size = 1,
   workerOptions = {},
   startupTimeout = 30000
-}: ThreadPoolOptions = {}): Promise<WorkerType> {
+}: ThreadPoolOptions = {}): Promise<WorkerType & BaseWorkerType> {
   debugOut('carving out a puddle...')
 
   type ExtendedWorkerType = BaseWorkerType & WorkerType & { all: WorkerType }
@@ -147,6 +147,12 @@ export async function createThreadPool<WorkerType extends BaseWorkerType> (worke
       busy: false
     }
 
+    worker.on('online', () => {
+      debugOut(`worker ${id} connected`)
+
+      thread.connected = true
+    })
+
     worker.on('exit', (code) => {
       debugOut('worker %d exited with code %d', id, code)
 
@@ -176,12 +182,6 @@ export async function createThreadPool<WorkerType extends BaseWorkerType> (worke
           workerRequest.reject(err)
         }
       }
-    })
-
-    worker.on('online', () => {
-      debugOut(`worker ${id} connected`)
-
-      thread.connected = true
     })
 
     worker.on('error', (err) => {

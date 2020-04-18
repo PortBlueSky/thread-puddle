@@ -1,2 +1,5 @@
 node_modules
 lib
+
+# for testing purposes
+test/workers/invalid-ts.ts
