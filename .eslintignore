@@ -2,4 +2,4 @@ node_modules
 lib
 
 # for testing purposes
-test/workers/invalid-ts.ts
+src/__tests__/workers/invalid-ts.ts

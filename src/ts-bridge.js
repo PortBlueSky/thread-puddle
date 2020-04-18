@@ -4,7 +4,7 @@ const createDebug = require('debug')
 const debug = createDebug('ts-bridge')
 
 require('ts-node').register()
-require(path.resolve(__dirname, 'worker.ts'))
+require(path.resolve(__dirname, 'worker'))
 
 // NOTE: ts-node seems to swallow uncaught exceptions,
 // and the error event on the worker is never triggered,

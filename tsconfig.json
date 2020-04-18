@@ -14,12 +14,12 @@
     },
     "include": [
       "src",
-      "test"
     ],
     "exclude": [
       "node_modules",
       "lib",
       "examples",
-      "src/__tests__/workers/invalid-ts.ts"
+      "src/__tests__",
+      "src/**/*.spec.ts"
     ]
   }
