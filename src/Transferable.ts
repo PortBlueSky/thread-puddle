@@ -17,10 +17,10 @@ export class TransferableValue {
   }
 }
 
-export function Transferable (obj, transferables) {
+export function Transferable (obj, transferables?) {
   new TransferableValue(obj, transferables)
 }
 
-export function withTransfer (obj, transferables) {
+export function withTransfer (obj, transferables?) {
   return new TransferableValue(obj, transferables)
 }

@@ -2,18 +2,20 @@ import path from 'path'
 import { EventEmitter } from 'events'
 import createDebug from 'debug'
 import { TransferableValue, withTransfer } from './Transferable'
+export { withTransfer } from './Transferable'
 import { MessagePort, Worker, MessageChannel, isMainThread } from 'worker_threads'
 
-const { threadId, debug: dynamicDebug } = require('./export-bridge')
+const { threadId: dynamicThreadId, debug: dynamicDebug } = require('./export-bridge')
+export const threadId = dynamicThreadId
 
-let debug = createDebug('puddle:master')
-let exportedDebug = debug
+let debugOut = createDebug('puddle:master')
+export let debug = debugOut
 if (!isMainThread) {
-  debug = createDebug(`puddle:parent:${threadId}:master`)
-  exportedDebug = dynamicDebug
+  debugOut = createDebug(`puddle:parent:${threadId}:master`)
+  debug = dynamicDebug
 }
 
-const workerProxyPath = path.resolve(__dirname, 'worker.js')
+const workerProxyPath = path.resolve(__dirname, 'ts-bridge.js')
 let __puddle__threadIdOffset: number = 1
 
 export type ThreadId = number
@@ -21,6 +23,7 @@ export type CallbackId = number
 
 export interface Thread {
   id: number;
+  connected: boolean;
   worker: Worker;
   port: MessagePort;
   error: Error | boolean;
@@ -63,13 +66,40 @@ export interface ThreadErrorMessage extends ThreadMessage {
   stack: string;
 }
 
-async function createThreadPool (workerPath, {
+export interface ThreadPoolOptions {
+  size?: number;
+  workerOptions?: any; // TODO: Use worker options type from node types
+  startupTimeout?: number;
+}
+
+export interface BaseWorkerType {
+  pool: PoolInterface;
+}
+
+export interface PoolInterface extends EventEmitter {
+  terminate(): void;
+  size: number;
+  isTerminated: boolean;
+}
+
+export async function createThreadPool<WorkerType extends BaseWorkerType> (workerPath: string, {
   size = 1,
   workerOptions = {},
   startupTimeout = 30000
-} = {}) {
-  debug('carving out a puddle...')
+}: ThreadPoolOptions = {}): Promise<WorkerType> {
+  debugOut('carving out a puddle...')
 
+  type ExtendedWorkerType = BaseWorkerType & WorkerType & { all: WorkerType }
+
+  // Based on: https://github.com/Microsoft/TypeScript/issues/20846#issuecomment-582183737
+  interface PoolProxyConstructor {
+    new <T, H extends object, K extends BaseWorkerType>(target: T, handler: ProxyHandler<H>): K
+  }
+
+  interface PoolProxyAllConstructor {
+    new <T, H extends object, K extends WorkerType>(target: T, handler: ProxyHandler<H>): K
+  }
+  
   const threads: Thread[] = []
   const availableThreads: Thread[] = []
   const threadRequests: ThreadRequest[] = []
@@ -103,12 +133,13 @@ async function createThreadPool (workerPath, {
   }
 
   const createThread = (id: ThreadId) => {
-    debug('creating worker thread %s', id)
+    debugOut('creating worker thread %s', id)
 
     const worker = new Worker(workerProxyPath, workerOptions)
     const { port1, port2 } = new MessageChannel()
     const thread: Thread = {
       id,
+      connected: false,
       worker,
       port: port2,
       error: false,
@@ -117,7 +148,7 @@ async function createThreadPool (workerPath, {
     }
 
     worker.on('exit', (code) => {
-      debug('worker %d exited with code %d', id, code)
+      debugOut('worker %d exited with code %d', id, code)
 
       if (puddleInterface.listenerCount('exit') > 0) {
         puddleInterface.emit('exit', code, id)
@@ -133,22 +164,28 @@ async function createThreadPool (workerPath, {
           }
         }
       }
-
+      
       // TODO: Ensure thread is not removed after being created from error
       removeThread(thread)
 
       if (threads.length === 0) {
         terminate()
 
-        const err = new Error('All workers exited before resolving')
+        const err = new Error('All workers exited before resolving (use an error event handler or DEBUG=puddle:*)')
         for (const workerRequest of threadRequests) {
           workerRequest.reject(err)
         }
       }
     })
 
+    worker.on('online', () => {
+      debugOut(`worker ${id} connected`)
+
+      thread.connected = true
+    })
+
     worker.on('error', (err) => {
-      debug(`worker ${id} Error: %s`, err.message)
+      debugOut(`worker ${id} Error: %s`, err.message)
 
       if (puddleInterface.listenerCount('error') > 0) {
         puddleInterface.emit('error', err)
@@ -168,8 +205,10 @@ async function createThreadPool (workerPath, {
         thread.error = err
 
         // TODO: Make auto respawn optional
-        debug(`restarting worker ${id} after uncaught error`)
-        createThread(id)
+        if (thread.connected) {
+          debugOut(`restarting worker ${id} after uncaught error`)
+          createThread(id)
+        }
       }
     })
 
@@ -183,7 +222,7 @@ async function createThreadPool (workerPath, {
     port2.on('message', (msg: ThreadMessage | ThreadErrorMessage) => {
       switch (msg.action) {
         case MessageAction.RESOLVE: {
-          debug('worker %d resolved callback %d', id, msg.callbackId)
+          debugOut('worker %d resolved callback %d', id, msg.callbackId)
           const callbacks = threadCallbacks.get(id)
           const callback = callbacks!.get(msg.callbackId)
           callbacks!.delete(msg.callbackId)
@@ -227,7 +266,7 @@ async function createThreadPool (workerPath, {
     threads.push(thread)
   }
 
-  debug('filling puddle with thread liquid...')
+  debugOut('filling puddle with thread liquid...')
 
   const idStart: ThreadId = __puddle__threadIdOffset
   const idEnd: ThreadId = idStart + size
@@ -245,7 +284,7 @@ async function createThreadPool (workerPath, {
     resolve: (thread: Thread) => void, 
     reject: (error: Error) => void
   ) {
-    debug('calling %s on worker %d', key, thread.id)
+    debugOut('calling %s on worker %d', key, thread.id)
     thread.busy = true
     const callbackId = callbackCount++
     threadCallbacks.get(thread.id)!.set(callbackId, { resolve, reject })
@@ -274,19 +313,24 @@ async function createThreadPool (workerPath, {
 
     if (availableThreads.length > 0) {
       const thread = availableThreads.shift()
-      debug('Resolving available worker %d', thread!.id)
+      debugOut('Resolving available worker %d', thread!.id)
       return resolve(thread)
     }
 
     const threadRequest: ThreadRequest = { resolve, reject }
     threadRequests.push(threadRequest)
-    debug('Added worker request')
+    debugOut('Added worker request')
   })
 
   const terminate = () => {
-    debug('pulling the plug on the puddle...')
-
+    if (isTerminated) {
+      return
+    }
+    
+    debugOut('pulling the plug on the puddle...')
+    
     isTerminated = true
+    
     for (const thread of threads) {
       thread.worker.terminate()
     }
@@ -299,14 +343,14 @@ async function createThreadPool (workerPath, {
     }, startupTimeout)
     const threadRequest = {
       resolve: (thread) => {
-        debug('worker %d ready', thread.id)
+        debugOut('worker %d ready', thread.id)
 
         clearTimeout(timeout)
         availableThreads.push(thread)
         resolve()
       },
       reject: (err) => {
-        debug('worker %d startup failed', thread.id)
+        debugOut('worker %d startup failed', thread.id)
 
         clearTimeout(timeout)
         terminate()
@@ -317,7 +361,7 @@ async function createThreadPool (workerPath, {
     threadRequests.push(threadRequest)
   })))
 
-  debug('puddle filled, happy splashing!')
+  debugOut('puddle filled, happy splashing!')
 
   Object.assign(puddleInterface, {
     terminate
@@ -333,7 +377,10 @@ async function createThreadPool (workerPath, {
     }
   })
 
-  const allWorkersInterface = new Proxy(allWorkersTarget, {
+  const PoolProxy = Proxy as PoolProxyConstructor
+  const PoolProxyAll= Proxy as PoolProxyAllConstructor
+
+  const allWorkersInterface = new PoolProxyAll<typeof target, typeof handler, WorkerType>(allWorkersTarget, {
     get: (target, key) => {
       if (key === 'then') {
         return undefined
@@ -351,10 +398,12 @@ async function createThreadPool (workerPath, {
     }
   })
 
-  return new Proxy({
-    pool: puddleInterface,
-    all: allWorkersInterface
-  }, {
+  const target = {
+    pool: puddleInterface as PoolInterface,
+    all: allWorkersInterface as WorkerType
+  }
+
+  const handler = {
     get: (target, key) => {
       // If the proxy is returned from an async function,
       // the engine checks if it is a thenable by checking existence of a then method
@@ -372,14 +421,7 @@ async function createThreadPool (workerPath, {
           .catch(err => reject(err))
       })
     }
-  })
-}
+  }
 
-module.exports = {
-  createPuddle: createThreadPool,
-  spawn: createThreadPool,
-  createThreadPool,
-  withTransfer,
-  threadId,
-  debug: exportedDebug
+  return new PoolProxy<typeof target, typeof handler, ExtendedWorkerType> (target, handler)
 }

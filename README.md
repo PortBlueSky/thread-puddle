@@ -16,6 +16,8 @@ A small library to pool Node.js [worker threads](https://nodejs.org/dist/latest-
 npm install thread-puddle
 ```
 
+_Note_: You can use worker threads in since __Node.js 12+__ without flag. From __Node.js 10.5+__ you need the `--experimental-worker` flag.
+
 ### Usage Example
 
 ```js
