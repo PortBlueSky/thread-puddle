@@ -1,21 +1,25 @@
-const { parentPort } = require('worker_threads')
-const createDebug = require('debug')
-const { Transferable } = require('./Transferable')
+import { parentPort } from 'worker_threads'
+import createDebug from 'debug'
+import { TransferableValue } from './Transferable'
+import majorVersion from './major-node-version'
+
 const dynamicExports = require('./export-bridge')
-const majorVersion = require('./major-node-version')
+
+if (!parentPort) {
+  throw new Error('No parentPort available')
+}
 
 parentPort.once('message', async (msg) => {
   if (msg.action === 'init') {
     const { workerPath, port, id, parentId } = msg
 
-    let debug = null
+    let debug = createDebug(`puddle:thread:${id}`)
     if (parentId) {
       debug = createDebug(`puddle:parent:${parentId}:thread:${id}`)
-    } else {
-      debug = createDebug(`puddle:thread:${id}`)
-    }
+    } 
+
     debug('Initializing worker thread...')
-    let worker = null
+    let worker: Record<string, Function | any> | null = null
 
     dynamicExports.threadId = id
     dynamicExports.debug = debug
@@ -25,6 +29,10 @@ parentPort.once('message', async (msg) => {
 
       if (majorVersion >= 13) {
         worker = await import(workerPath)
+
+        if (!worker) {
+          throw new Error('Workes does not expose a mountable object')
+        }
 
         const workerKeys = Object.keys(worker)
         isCommonJS = workerKeys.length === 1 && workerKeys[0] === 'default'
@@ -44,8 +52,8 @@ parentPort.once('message', async (msg) => {
       }
 
       let callables = 0
-      for (const key of Object.keys(worker)) {
-        if (typeof worker[key] === 'function') {
+      for (const key of Object.keys(worker!)) {
+        if (typeof worker![key] === 'function') {
           callables++
         }
       }
@@ -64,15 +72,15 @@ parentPort.once('message', async (msg) => {
 
           try {
             // TODO: ensure hasOwnProperty
-            if (typeof worker[key] !== 'function') {
+            if (typeof worker![key] !== 'function') {
               debug('%s is not a function', key)
               throw new Error(`"${key}" is not a function in this worker thread`)
             }
-            const result = await worker[key](...args)
+            const result = await worker![key](...args)
 
             debug('worker done with thread method %s', key)
 
-            if (result instanceof Transferable) {
+            if (result instanceof TransferableValue) {
               port.postMessage({
                 action: 'resolve',
                 callbackId,

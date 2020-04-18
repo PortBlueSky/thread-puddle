@@ -6,11 +6,18 @@
   "author": "Sebastian Herrlinger <hasta84@gmail.com>",
   "license": "MIT",
   "devDependencies": {
+    "@types/debug": "^4.1.5",
+    "@types/jest": "^25.2.1",
+    "@types/node": "^13.13.0",
+    "@typescript-eslint/parser": "^2.28.0",
     "jest": "^25.1.0",
-    "standard": "^14.3.3"
+    "standard": "^14.3.3",
+    "ts-jest": "^25.4.0",
+    "typescript": "^3.8.3"
   },
   "scripts": {
-    "test": "jest"
+    "test": "jest",
+    "build": "tsc"
   },
   "dependencies": {
     "debug": "^4.1.1"
