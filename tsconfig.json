@@ -1,0 +1,25 @@
+{
+    "compilerOptions": {
+      "declaration": true,
+      "strictNullChecks": true,
+      "target": "esnext", 
+      "outDir": "lib",
+      "module": "commonjs",
+      "moduleResolution": "node",
+      "esModuleInterop": true,
+      "sourceMap": true,
+      "allowJs": true,
+      "lib": ["esnext"],
+      "rootDir": "src"
+    },
+    "include": [
+      "src",
+    ],
+    "exclude": [
+      "node_modules",
+      "lib",
+      "examples",
+      "src/__tests__",
+      "src/**/*.spec.ts"
+    ]
+  }

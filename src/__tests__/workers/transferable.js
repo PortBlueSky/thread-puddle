@@ -1,4 +1,4 @@
-const { withTransfer } = require('../../src')
+const { withTransfer } = require('../../')
 
 const uint8Array = new Uint8Array([1, 2, 3, 4])
 const uint16Array = new Uint16Array([1, 2, 3, 4])

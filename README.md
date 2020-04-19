@@ -6,9 +6,11 @@
 
 ## Turn any module into a worker thread
 
-[![Build Status](https://travis-ci.com/kommander/thread-puddle.svg?branch=master)](https://travis-ci.com/kommander/thread-puddle) [![npm version](https://badge.fury.io/js/thread-puddle.svg)](https://badge.fury.io/js/thread-puddle)
+[![Build Status](https://travis-ci.com/kommander/thread-puddle.svg?branch=master)](https://travis-ci.com/kommander/thread-puddle) [![npm version](https://badge.fury.io/js/thread-puddle.svg)](https://badge.fury.io/js/thread-puddle) [![Coverage Status](https://coveralls.io/repos/github/kommander/thread-puddle/badge.svg?branch=typescript)](https://coveralls.io/github/kommander/thread-puddle?branch=typescript)
 
 A small library to pool Node.js [worker threads](https://nodejs.org/dist/latest-v13.x/docs/api/worker_threads.html), automatically exposing exported module methods using [Proxy Objects](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Proxy).
+
+__+ Full TypeScript Support__ (using [ts-node](https://github.com/TypeStrong/ts-node))
 
 ### Installation
 
@@ -16,31 +18,70 @@ A small library to pool Node.js [worker threads](https://nodejs.org/dist/latest-
 npm install thread-puddle
 ```
 
+_Note_: You can use worker threads since __Node.js 12+__ without flag. For __Node.js 10.5+__ you need the `--experimental-worker` flag.
+
 ### Usage Example
 
-```js
-// worker.js
+```ts
+// worker.ts
+export interface IMyWorker {
+  say(): string;
+}
+
 module.exports = {
   say: () => 'Hello!'
-}
+} as IMyWorker
 ```
 
-```js
-// main.js
-const { createThreadPool } = require('thread-puddle')
+```ts
+// main.ts
+import { createThreadPool } from '../../lib'
+import { IMyWorker } from './worker'
 
-const worker = await createThreadPool('/path/to/worker.js', {
+const worker = await createThreadPool<IMyWorker>('./worker', {
   size: 2
 })
 
 const result = await worker.say()
 
 console.log(result) // -> "Hello!"
+
+worker.pool.terminate()
 ```
+
+This and more examples in plain JS can be found in the `examples` directory.
+
+## Typing
+
+`createThreadPool` uses TypeScript [generics](https://www.typescriptlang.org/docs/handbook/generics.html) and [other](https://www.typescriptlang.org/docs/handbook/utility-types.html#picktk) [advanced](https://www.typescriptlang.org/docs/handbook/utility-types.html#parameterst) [features](https://www.typescriptlang.org/docs/handbook/utility-types.html#returntypet) to give you the type of how your worker module will actually be exposed to the main thread.
+
+__TL;DR__: The captured type for your thread will be modified to only return async methods and be extended with the pool interface.
+
+Example:
+
+```ts
+interface Calculations {
+  crunchNumbers(data: number[]): number;
+}
+
+// Using as worker type:
+const worker = createThreadPool<Calculations>('./calc-worker')
+
+// Will basically become:
+interface Calculations {
+  crunchNumbers(data: number[]): Promise<number>;
+  pool: PoolInterface
+}
+
+// Expressed as:
+const worker: WrapReturnType<Pick<ValidWorker, "crunchNumbers">> & BaseWorkerType
+
+```
+
 
 ## API
 
-### `async createThreadPool(workerPath, [options])`
+### `async createThreadPool<T>(workerPath, [options])`
 
 Creates a pool of workers and waits until all workers are ready to call methods on, then returns a Proxy Object which will forward method calls to the worker.
 

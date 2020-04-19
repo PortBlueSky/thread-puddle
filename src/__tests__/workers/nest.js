@@ -1,5 +1,5 @@
 const path = require('path')
-const { createThreadPool } = require('../../src')
+const { createThreadPool } = require('../../')
 
 let nestedWorker = null
 

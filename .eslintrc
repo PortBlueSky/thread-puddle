@@ -1,0 +1,49 @@
+{
+  "parser": "@typescript-eslint/parser",
+  "extends": [
+    "plugin:@typescript-eslint/recommended"
+  ],
+  "parserOptions": {
+    "ecmaVersion": 2018,
+    "sourceType": "module",
+    "ecmaFeatures": {
+      "jsx": true
+    },
+    "project": "./tsconfig.json"
+  },
+  "rules": {
+    "@typescript-eslint/explicit-function-return-type": "off",
+    "@typescript-eslint/no-namespace": "off",
+    "@typescript-eslint/interface-name-prefix": "off",
+    "@typescript-eslint/no-empty-function": "off",
+    "@typescript-eslint/no-explicit-any": "off",
+    "@typescript-eslint/no-non-null-assertion": "off",
+    "@typescript-eslint/no-var-requires": "off",
+    "@typescript-eslint/no-this-alias": "warn",
+    "@typescript-eslint/no-unused-vars": [
+      "error",
+      {
+        "vars": "all",
+        "args": "none",
+        "ignoreRestASiblings": false
+      }
+    ],
+    "@typescript-eslint/no-use-before-define": "off",
+    "indent": [
+      "error",
+      2,
+      {
+        "SwitchCase": 1
+      }
+    ],
+    "no-camelcase": "off",
+    "no-unused-vars": "off",
+    "react/display-name": "off"
+  },
+  "reportUnusedDisableDirectives": true,
+  "settings": {
+    "react": {
+      "version": "detect"
+    }
+  }
+}
