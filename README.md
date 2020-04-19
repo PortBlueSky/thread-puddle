@@ -51,6 +51,34 @@ worker.pool.terminate()
 
 This and more examples in plain JS can be found in the `examples` directory.
 
+## Typing
+
+`createThreadPool` uses TypeScript [generics](https://www.typescriptlang.org/docs/handbook/generics.html) and [other](https://www.typescriptlang.org/docs/handbook/utility-types.html#picktk) [advanced](https://www.typescriptlang.org/docs/handbook/utility-types.html#parameterst) [features](https://www.typescriptlang.org/docs/handbook/utility-types.html#returntypet) to give you the type of how your worker module will actually be exposed to the main thread.
+
+__TL;DR__: The captured type for your thread will be modified to only return async methods and be extended with the pool interface.
+
+Example:
+
+```ts
+interface Calculations {
+  crunchNumbers(data: number[]): number;
+}
+
+// Using as worker type:
+const worker = createThreadPool<Calculations>('./calc-worker')
+
+// Will basically become:
+interface Calculations {
+  crunchNumbers(data: number[]): Promise<number>;
+  pool: PoolInterface
+}
+
+// Expressed as:
+const worker: WrapReturnType<Pick<ValidWorker, "crunchNumbers">> & BaseWorkerType
+
+```
+
+
 ## API
 
 ### `async createThreadPool<T>(workerPath, [options])`
