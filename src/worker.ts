@@ -27,25 +27,18 @@ parentPort.once('message', async (msg) => {
     try {
       let isCommonJS = false
 
-      if (majorVersion >= 13) {
-        worker = await import(workerPath)
+      
+      worker = await import(workerPath)
 
-        if (!worker) {
-          throw new Error('Worker does not expose a mountable object')
-        }
-
-        const workerKeys = Object.keys(worker)
-        isCommonJS = workerKeys.length === 1 && workerKeys[0] === 'default'
-
-        if (isCommonJS) {
-          worker = worker.default
-        }
-      } else {
-        worker = require(workerPath)
-        isCommonJS = true
+      if (!worker) {
+        throw new Error('Worker does not expose a mountable object')
       }
 
+      const workerKeys = Object.keys(worker)
+      isCommonJS = workerKeys.length === 1 && workerKeys[0] === 'default'
+
       if (isCommonJS) {
+        worker = worker.default
         if (!(worker instanceof Object)) {
           throw new Error(`Worker should export an object, got ${worker}`)
         }
