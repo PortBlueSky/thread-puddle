@@ -1,5 +1,5 @@
 // main.js
-const { createThreadPool } = require('../../src')
+const { createThreadPool } = require('../../lib')
 const path = require('path')
 
 async function start () {

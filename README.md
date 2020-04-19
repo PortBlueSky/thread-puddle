@@ -10,6 +10,8 @@
 
 A small library to pool Node.js [worker threads](https://nodejs.org/dist/latest-v13.x/docs/api/worker_threads.html), automatically exposing exported module methods using [Proxy Objects](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Proxy).
 
+__+ Full TypeScript Support__ (using [ts-node](https://github.com/TypeStrong/ts-node))
+
 ### Installation
 
 ```bash
@@ -20,29 +22,38 @@ _Note_: You can use worker threads in since __Node.js 12+__ without flag. From _
 
 ### Usage Example
 
-```js
-// worker.js
+```ts
+// worker.ts
+export interface IMyWorker {
+  say(): string;
+}
+
 module.exports = {
   say: () => 'Hello!'
-}
+} as IMyWorker
 ```
 
-```js
-// main.js
-const { createThreadPool } = require('thread-puddle')
+```ts
+// main.ts
+import { createThreadPool } from '../../lib'
+import { IMyWorker } from './worker'
 
-const worker = await createThreadPool('/path/to/worker.js', {
+const worker = await createThreadPool<IMyWorker>('./worker', {
   size: 2
 })
 
 const result = await worker.say()
 
 console.log(result) // -> "Hello!"
+
+worker.pool.terminate()
 ```
+
+This and more examples in plain JS can be found in the `examples` directory.
 
 ## API
 
-### `async createThreadPool(workerPath, [options])`
+### `async createThreadPool<T>(workerPath, [options])`
 
 Creates a pool of workers and waits until all workers are ready to call methods on, then returns a Proxy Object which will forward method calls to the worker.
 
