@@ -82,14 +82,28 @@ export interface PoolInterface extends EventEmitter {
   isTerminated: boolean;
 }
 
+
+type FilterType<Base, Condition> = Pick<Base, {
+  [Key in keyof Base]: Base[Key] extends Condition ? Key : never
+}[keyof Base]>;
+
+type WrapReturnType<Base extends { [a: string]: (...a: any) => any }> = {
+  [Key in keyof Base]: Base[Key] extends (...a: any) => Promise<any> 
+    ? Base[Key] 
+    : (...a: Parameters<Base[Key]>) => Promise<ReturnType<Base[Key]>>;
+};
+
+type FilterAndWrap<Base> = WrapReturnType<FilterType<Base, Function>>
+
+
 export async function createThreadPool<WorkerType extends object> (workerPath: string, {
   size = 1,
   workerOptions = {},
   startupTimeout = 30000
-}: ThreadPoolOptions = {}): Promise<WorkerType & BaseWorkerType> {
+}: ThreadPoolOptions = {}): Promise<FilterAndWrap<WorkerType> & BaseWorkerType> {
   debugOut('carving out a puddle...')
 
-  type ExtendedWorkerType = BaseWorkerType & WorkerType & { all: WorkerType }
+  type ExtendedWorkerType = BaseWorkerType & FilterAndWrap<WorkerType> & { all: FilterAndWrap<WorkerType> }
 
   // Based on: https://github.com/Microsoft/TypeScript/issues/20846#issuecomment-582183737
   interface PoolProxyConstructor {
@@ -400,7 +414,7 @@ export async function createThreadPool<WorkerType extends object> (workerPath: s
 
   const target = {
     pool: puddleInterface as PoolInterface,
-    all: allWorkersInterface as WorkerType
+    all: allWorkersInterface as FilterAndWrap<WorkerType>
   }
 
   const handler = {

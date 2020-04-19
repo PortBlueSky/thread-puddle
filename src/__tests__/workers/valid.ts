@@ -1,7 +1,7 @@
 export interface ValidWorker {
-  someMethod(): Promise<string>
+  someMethod(): string
 }
 
 export default {
-  someMethod: () => Promise.resolve('hello ts')
+  someMethod: () => 'hello ts'
 } as ValidWorker
