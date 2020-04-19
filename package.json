@@ -19,7 +19,8 @@
   "scripts": {
     "test": "jest --coverage",
     "build": "tsc",
-    "coveralls": "coveralls < coverage/lcov.info"
+    "coveralls": "coveralls < coverage/lcov.info",
+    "prepack": "yarn build"
   },
   "dependencies": {
     "debug": "^4.1.1",

@@ -1,5 +1,16 @@
 # Changelog
 
+## Version 0.3.0
+
+- TypeScript support :tada:
+  Building a TypeScript worker on-the-fly with ts-node,
+  generic `createThreadPool<OwnType>` pool creation
+  with generated type from a custom worker type (promise wrapped methods).
+
+## Version 0.2.1, 0.2.2
+
+- Bump dev dependency versions for security update
+
 ## Version 0.2.0
 
 - Puddle internal thread id is exposed to worker via `const { threadId } = require('thread-puddle')`.
