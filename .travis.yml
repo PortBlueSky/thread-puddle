@@ -6,3 +6,5 @@ node_js:
   - "13.13.0"
 before_script:
   - yarn install
+after_success: 
+  - yarn coveralls
