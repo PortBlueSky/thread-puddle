@@ -1,12 +1,12 @@
 <p align="center">
-  <img width="320" height="167" src="https://github.com/kommander/thread-puddle/blob/master/assets/tp-logo.png?raw=true">
+  <img width="320" height="167" src="https://github.com/PortBlueSky/thread-puddle/blob/master/assets/tp-logo.png?raw=true">
 </p>
 
 # thread-puddle
 
 ## Turn any module into a worker thread
 
-[![Build Status](https://travis-ci.com/kommander/thread-puddle.svg?branch=master)](https://travis-ci.com/kommander/thread-puddle) [![npm version](https://badge.fury.io/js/thread-puddle.svg)](https://badge.fury.io/js/thread-puddle) [![Coverage Status](https://coveralls.io/repos/github/kommander/thread-puddle/badge.svg?branch=typescript)](https://coveralls.io/github/kommander/thread-puddle?branch=typescript)
+[![Build Status](https://travis-ci.com/PortBlueSky/thread-puddle.svg?branch=master)](https://travis-ci.com/PortBlueSky/thread-puddle) [![npm version](https://badge.fury.io/js/thread-puddle.svg)](https://badge.fury.io/js/thread-puddle) [![Coverage Status](https://coveralls.io/repos/github/PortBlueSky/thread-puddle/badge.svg?branch=typescript)](https://coveralls.io/github/PortBlueSky/thread-puddle?branch=typescript)
 
 A small library to pool Node.js [worker threads](https://nodejs.org/dist/latest-v13.x/docs/api/worker_threads.html), automatically exposing exported module methods using [Proxy Objects](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Proxy).
 
