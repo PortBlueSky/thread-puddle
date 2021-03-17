@@ -3,7 +3,13 @@ const createDebug = require('debug')
 
 const debug = createDebug('ts-bridge')
 
-require('ts-node').register()
+try {
+  require.resolve('ts-node')
+  require('ts-node').register()
+} catch (e) {
+  debug('ts-node not available')
+}
+
 require(path.resolve(__dirname, 'worker'))
 
 // NOTE: ts-node seems to swallow uncaught exceptions,
