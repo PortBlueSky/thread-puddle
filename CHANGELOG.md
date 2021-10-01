@@ -1,5 +1,8 @@
 # Changelog
 
+## Version 0.3.1
+  - Make ts-node optional #7 (@spmiller)
+  - Bump some dev dependency versions
 ## Version 0.3.0
 
 - TypeScript support :tada:
