@@ -1,7 +1,7 @@
 const path = require('path')
 const createDebug = require('debug')
 
-const debug = createDebug('ts-bridge')
+const debug = createDebug('puddle:ts-bridge')
 
 try {
   require.resolve('ts-node')
@@ -10,6 +10,7 @@ try {
   debug('ts-node not available')
 }
 
+debug('resolving worker...')
 require(path.resolve(__dirname, 'worker'))
 
 // NOTE: ts-node seems to swallow uncaught exceptions,

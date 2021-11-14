@@ -1,7 +1,7 @@
 import { parentPort } from 'worker_threads'
 import createDebug from 'debug'
 import { TransferableValue } from './Transferable'
-import majorVersion from './major-node-version'
+import { MainMessage } from '.'
 
 const dynamicExports = require('./export-bridge')
 
@@ -58,7 +58,7 @@ parentPort.once('message', async (msg) => {
       return
     }
 
-    port.on('message', async ({ action, key, args, callbackId }) => {
+    port.on('message', async ({ action, key, args, callbackId }: MainMessage) => {
       switch (action) {
         case 'call': {
           debug('calling worker thread method %s', key)

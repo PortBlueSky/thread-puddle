@@ -9,6 +9,8 @@
       "esModuleInterop": true,
       "sourceMap": true,
       "allowJs": true,
+      "strict": true,
+      "noImplicitAny": true,
       "lib": ["esnext"],
       "rootDir": "src"
     },
