@@ -245,7 +245,7 @@ describe('Error Handling', () => {
     expect(worker.pool).toHaveProperty('size', 2)
   })
 
-  it.skip('rejects open method calls when a worker crashes', async () => {
+  it('rejects open method calls when a worker crashes', async () => {
     const result = await Promise.all([
       worker.waitForUncaughtException(10).catch((err: Error) => err),
       worker.waitForUncaughtException(10).catch((err: Error) => err),
@@ -263,7 +263,7 @@ describe('Error Handling', () => {
     result.map(err => expect(err).toHaveProperty('message', 'Worker thread exited before resolving'))
   })
 
-  it.skip('rejects waiting method calls when all workers exited', async () => {
+  it('rejects waiting method calls when all workers exited', async () => {
     const [one, two, three, four] = await Promise.all([
       worker.exitWorker(10).catch((err: Error) => err),
       worker.exitWorker(10).catch((err: Error) => err),
@@ -273,11 +273,11 @@ describe('Error Handling', () => {
 
     expect(one).toHaveProperty('message', 'Worker thread exited before resolving')
     expect(two).toHaveProperty('message', 'Worker thread exited before resolving')
-    expect(three).toHaveProperty('message', 'All workers exited before resolving')
-    expect(four).toHaveProperty('message', 'All workers exited before resolving')
+    expect(three).toHaveProperty('message', 'All workers exited before resolving (use an error event handler or DEBUG=puddle:*)')
+    expect(four).toHaveProperty('message', 'All workers exited before resolving (use an error event handler or DEBUG=puddle:*)')
   })
 
-  it.skip('emits an error event when a worker errors', async () => {
+  it('emits an error event when a worker errors', async () => {
     const fn = jest.fn()
     worker.pool.on('error', fn)
 
