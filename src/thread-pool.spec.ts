@@ -152,6 +152,7 @@ describe('Basic Features', () => {
 
   it.todo('allows to call methods on the parent thread')
   it.todo('can call a method on a specific worker directly')
+  it.todo('warns if call queue becomes too large')
 })
 
 if (majorVersion >= 13) {
