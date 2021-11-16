@@ -112,7 +112,7 @@ export async function createThreadPool<WorkerType extends object> (workerPath: s
   size = 1,
   workerOptions = {},
   startupTimeout = 30000
-}: ThreadPoolOptions = {}): Promise<FilterAndWrap<WorkerType> & BaseWorkerType> {
+}: ThreadPoolOptions = {}): Promise<FilterAndWrap<WorkerType> & BaseWorkerType & { all: FilterAndWrap<WorkerType> }> {
   debugOut('carving out a puddle...')
 
   type TargetWorkerType = BaseWorkerType & { all: FilterAndWrap<WorkerType> }
