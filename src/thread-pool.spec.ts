@@ -15,7 +15,7 @@ const noObjectWorkerPath = path.resolve(__dirname, './__tests__/workers/no-objec
 const invalidTsWorkerPath = path.resolve(__dirname, './__tests__/workers/invalid-ts.ts')
 const validTsWorkerPath = path.resolve(__dirname, './__tests__/workers/valid.ts')
 
-const countBy = (list) => list.reduce((acc, key) => {
+const countBy = (list: string[]) => list.reduce((acc: Record<string, number>, key: string) => {
   if (acc[key]) {
     acc[key] += 1
     return acc
@@ -25,10 +25,10 @@ const countBy = (list) => list.reduce((acc, key) => {
 }, {})
 
 describe('Basic Features', () => {
-  let worker
+  let worker: any
 
   beforeEach(async () => {
-    worker = await createThreadPool(basicWorkerPath, {
+    worker = await createThreadPool<any>(basicWorkerPath, {
       size: 2,
       workerOptions: {
         workerData: {
@@ -152,11 +152,12 @@ describe('Basic Features', () => {
 
   it.todo('allows to call methods on the parent thread')
   it.todo('can call a method on a specific worker directly')
+  it.todo('warns if call queue becomes too large')
 })
 
 if (majorVersion >= 13) {
   describe('ES6 Modules', () => {
-    let worker
+    let worker: any
 
     afterEach(() => {
       worker.pool.terminate()
@@ -187,7 +188,7 @@ if (majorVersion >= 13) {
 }
 
 describe('Nested Threads', () => {
-  let worker
+  let worker: any
 
   beforeEach(async () => {
     worker = await createThreadPool(path.resolve(__dirname, './__tests__/workers/nest.js'))
@@ -206,7 +207,7 @@ describe('Nested Threads', () => {
 })
 
 describe('Error Handling', () => {
-  let worker
+  let worker: any
 
   beforeEach(async () => {
     worker = await createThreadPool(basicWorkerPath, {
@@ -245,39 +246,39 @@ describe('Error Handling', () => {
     expect(worker.pool).toHaveProperty('size', 2)
   })
 
-  it.skip('rejects open method calls when a worker crashes', async () => {
+  it('rejects open method calls when a worker crashes', async () => {
     const result = await Promise.all([
-      worker.waitForUncaughtException(10).catch(err => err),
-      worker.waitForUncaughtException(10).catch(err => err),
-      worker.waitForUncaughtException(10).catch(err => err),
-      worker.waitForUncaughtException(10).catch(err => err)
+      worker.waitForUncaughtException(10).catch((err: Error) => err),
+      worker.waitForUncaughtException(10).catch((err: Error) => err),
+      worker.waitForUncaughtException(10).catch((err: Error) => err),
+      worker.waitForUncaughtException(10).catch((err: Error) => err)
     ])
     result.map(err => expect(err).toHaveProperty('message', 'Worker failure'))
   })
 
   it('rejects open method calls when worker exits', async () => {
     const result = await Promise.all([
-      worker.exitWorker(10).catch(err => err),
-      worker.exitWorker(10).catch(err => err)
+      worker.exitWorker(10).catch((err: Error) => err),
+      worker.exitWorker(10).catch((err: Error) => err)
     ])
     result.map(err => expect(err).toHaveProperty('message', 'Worker thread exited before resolving'))
   })
 
-  it.skip('rejects waiting method calls when all workers exited', async () => {
+  it('rejects waiting method calls when all workers exited', async () => {
     const [one, two, three, four] = await Promise.all([
-      worker.exitWorker(10).catch(err => err),
-      worker.exitWorker(10).catch(err => err),
-      worker.exitWorker(10).catch(err => err),
-      worker.exitWorker(10).catch(err => err)
+      worker.exitWorker(10).catch((err: Error) => err),
+      worker.exitWorker(10).catch((err: Error) => err),
+      worker.exitWorker(10).catch((err: Error) => err),
+      worker.exitWorker(10).catch((err: Error) => err)
     ])
 
     expect(one).toHaveProperty('message', 'Worker thread exited before resolving')
     expect(two).toHaveProperty('message', 'Worker thread exited before resolving')
-    expect(three).toHaveProperty('message', 'All workers exited before resolving')
-    expect(four).toHaveProperty('message', 'All workers exited before resolving')
+    expect(three).toHaveProperty('message', 'All workers exited before resolving (use an error event handler or DEBUG=puddle:*)')
+    expect(four).toHaveProperty('message', 'All workers exited before resolving (use an error event handler or DEBUG=puddle:*)')
   })
 
-  it.skip('emits an error event when a worker errors', async () => {
+  it('emits an error event when a worker errors', async () => {
     const fn = jest.fn()
     worker.pool.on('error', fn)
 
@@ -341,7 +342,7 @@ describe('Startup', () => {
 })
 
 describe('Termination', () => {
-  let worker
+  let worker: any
 
   afterEach(() => {
     worker.pool.terminate()
@@ -356,7 +357,7 @@ describe('Termination', () => {
 
     worker.pool.terminate()
 
-    const err = await value.catch(err => err)
+    const err = await value.catch((err: Error) => err)
 
     expect(worker.pool).toHaveProperty('isTerminated', true)
     expect(err).toHaveProperty('message', 'Worker thread exited before resolving')
@@ -369,14 +370,14 @@ describe('Termination', () => {
 
     worker.pool.terminate()
 
-    const err = await worker.asyncFn('value', 100).catch(err => err)
+    const err = await worker.asyncFn('value', 100).catch((err: Error) => err)
 
     expect(err).toHaveProperty('message', 'Worker pool already terminated.')
   })
 })
 
 describe('Single Method Modules', () => {
-  let worker
+  let worker: any
 
   beforeEach(async () => {
     worker = await createThreadPool(basicWorkerPath, {
@@ -393,7 +394,7 @@ describe('Single Method Modules', () => {
 })
 
 describe('Alias', () => {
-  let worker
+  let worker: any
 
   beforeEach(async () => {
     worker = await createThreadPool(basicWorkerPath, {
@@ -413,7 +414,7 @@ describe('Alias', () => {
 })
 
 describe('Transferable', () => {
-  let worker
+  let worker: any
 
   beforeEach(async () => {
     worker = await createThreadPool(transferableWorkerPath)
@@ -427,7 +428,7 @@ describe('Transferable', () => {
     const arr1 = await worker.getArray()
     const arr2 = await worker.tryToUseArray()
     const arr3 = await worker.getTransferredArray()
-    const err = await worker.tryToUseArray().catch(err => err)
+    const err = await worker.tryToUseArray().catch((err: Error) => err)
 
     expect(arr1).toEqual(new Uint8Array([1, 2, 3, 4]))
     expect(arr2).toEqual(new Uint8Array([2, 3, 4, 5]))

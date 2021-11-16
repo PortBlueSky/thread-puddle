@@ -55,10 +55,21 @@ export enum MessageAction {
   STARTUP_ERROR = 'startup-error'
 }
 
+export enum MainMessageAction {
+  CALL = 'call',
+}
+
 export interface ThreadMessage {
   action: MessageAction;
   callbackId: CallbackId;
   result: any;
+}
+
+export interface MainMessage {
+  action: MainMessageAction,
+  key: string,
+  callbackId: number,
+  args: any
 }
 
 export interface ThreadErrorMessage extends ThreadMessage {
@@ -82,6 +93,7 @@ export interface PoolInterface extends EventEmitter {
   isTerminated: boolean;
 }
 
+type ProxyWorkerTarget = Record<string, any>
 
 type FilterType<Base, Condition> = Pick<Base, {
   [Key in keyof Base]: Base[Key] extends Condition ? Key : never
@@ -100,10 +112,11 @@ export async function createThreadPool<WorkerType extends object> (workerPath: s
   size = 1,
   workerOptions = {},
   startupTimeout = 30000
-}: ThreadPoolOptions = {}): Promise<FilterAndWrap<WorkerType> & BaseWorkerType> {
+}: ThreadPoolOptions = {}): Promise<FilterAndWrap<WorkerType> & BaseWorkerType & { all: FilterAndWrap<WorkerType> }> {
   debugOut('carving out a puddle...')
 
-  type ExtendedWorkerType = BaseWorkerType & FilterAndWrap<WorkerType> & { all: FilterAndWrap<WorkerType> }
+  type TargetWorkerType = BaseWorkerType & { all: FilterAndWrap<WorkerType> }
+  type ExtendedWorkerType = TargetWorkerType & FilterAndWrap<WorkerType>
 
   // Based on: https://github.com/Microsoft/TypeScript/issues/20846#issuecomment-582183737
   interface PoolProxyConstructor {
@@ -304,7 +317,7 @@ export async function createThreadPool<WorkerType extends object> (workerPath: s
     threadCallbacks.get(thread.id)!.set(callbackId, { resolve, reject })
 
     const transferables: Array<MessagePort | ArrayBuffer> = []
-    const iteratedArgs = args.map((arg: TransferableValue) => {
+    const iteratedArgs = args.map((arg: any) => {
       if (arg instanceof TransferableValue) {
         transferables.push(...arg.transferables)
         return arg.obj
@@ -320,7 +333,7 @@ export async function createThreadPool<WorkerType extends object> (workerPath: s
     }, transferables)
   }
 
-  const getAvailableThread = () => new Promise((resolve, reject) => {
+  const getAvailableThread = () => new Promise<Thread>((resolve, reject) => {
     if (isTerminated) {
       return reject(new Error('Worker pool already terminated.'))
     }
@@ -328,7 +341,7 @@ export async function createThreadPool<WorkerType extends object> (workerPath: s
     if (availableThreads.length > 0) {
       const thread = availableThreads.shift()
       debugOut('Resolving available worker %d', thread!.id)
-      return resolve(thread)
+      return resolve(thread as Thread)
     }
 
     const threadRequest: ThreadRequest = { resolve, reject }
@@ -350,12 +363,12 @@ export async function createThreadPool<WorkerType extends object> (workerPath: s
     }
   }
 
-  await Promise.all(threads.map((thread) => new Promise((resolve, reject) => {
+  await Promise.all(threads.map((thread) => new Promise<void>((resolve, reject) => {
     const timeout = setTimeout(() => {
       terminate()
       reject(new Error(`Worker ${thread.id} initialization timed out`))
     }, startupTimeout)
-    const threadRequest = {
+    const threadRequest: ThreadRequest = {
       resolve: (thread) => {
         debugOut('worker %d ready', thread.id)
 
@@ -392,15 +405,16 @@ export async function createThreadPool<WorkerType extends object> (workerPath: s
   })
 
   const PoolProxy = Proxy as PoolProxyConstructor
-  const PoolProxyAll= Proxy as PoolProxyAllConstructor
-
-  const allWorkersInterface = new PoolProxyAll<typeof target, typeof handler, WorkerType>(allWorkersTarget, {
-    get: (target, key) => {
+  const PoolProxyAll = Proxy as PoolProxyAllConstructor
+  const allWorkersHandler = {
+    get: (target: ProxyWorkerTarget, key: string) => {
+      // NOTE: If the proxy is returned from an async function,
+      // the engine checks if it is a thenable by checking existence of a then method
       if (key === 'then') {
         return undefined
       }
 
-      return (...args) => Promise.all(
+      return (...args: any[]) => Promise.all(
         threads.map(thread => new Promise((resolve, reject) => {
           if (!thread.busy) {
             callOnThread(thread, key, args, resolve, reject)
@@ -410,26 +424,32 @@ export async function createThreadPool<WorkerType extends object> (workerPath: s
         }))
       )
     }
-  })
+  }
 
-  const target = {
+  const allWorkersInterface: WorkerType = new PoolProxyAll<
+    typeof allWorkersTarget, 
+    typeof allWorkersHandler, 
+    WorkerType
+  >(allWorkersTarget, allWorkersHandler)
+
+  const target: TargetWorkerType = {
     pool: puddleInterface as PoolInterface,
     all: allWorkersInterface as FilterAndWrap<WorkerType>
   }
 
   const handler = {
-    get: (target, key) => {
-      // If the proxy is returned from an async function,
+    get: (target: ProxyWorkerTarget, key: string) => {
+      // NOTE: If the proxy is returned from an async function,
       // the engine checks if it is a thenable by checking existence of a then method
       if (key === 'then') {
         return undefined
       }
 
-      if (['pool', 'all'].includes(key as string)) {
+      if (key === 'pool' || key === 'all') {
         return target[key]
       }
 
-      return (...args) => new Promise((resolve, reject) => {
+      return (...args: any[]) => new Promise((resolve, reject) => {
         getAvailableThread()
           .then((thread: Thread) => callOnThread(thread, key, args, resolve, reject))
           .catch(err => reject(err))
