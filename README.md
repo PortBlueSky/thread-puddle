@@ -8,9 +8,9 @@
 
 [![Build Status](https://travis-ci.com/PortBlueSky/thread-puddle.svg?branch=master)](https://travis-ci.com/PortBlueSky/thread-puddle) [![npm version](https://badge.fury.io/js/thread-puddle.svg)](https://badge.fury.io/js/thread-puddle) [![Coverage Status](https://coveralls.io/repos/github/PortBlueSky/thread-puddle/badge.svg?branch=master)](https://coveralls.io/github/PortBlueSky/thread-puddle?branch=master)
 
-A small library to pool Node.js [worker threads](https://nodejs.org/dist/latest-v13.x/docs/api/worker_threads.html), automatically exposing exported module methods using [Proxy Objects](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Proxy).
+A small library to pool Node.js [worker threads](https://nodejs.org/dist/latest-v13.x/docs/api/worker_threads.html), automatically exposing exported module methods using [Proxy Objects](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Proxy) for easy bi-directional communication between main and worker thread.
 
-__+ Full TypeScript Support__ (using [ts-node](https://github.com/TypeStrong/ts-node))
+__+ Full TypeScript Support__ (optionally using [ts-node](https://github.com/TypeStrong/ts-node) in development)
 
 ### Installation
 
@@ -187,7 +187,7 @@ Nested Namespaces:
 The debug method with the correct namespace is exported from the `thread-puddle` entry point.
 
 ---
-&copy; 2020 Sebastian Herrlinger
+&copy; 2021 Sebastian Herrlinger
 
 Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
 
