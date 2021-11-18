@@ -148,10 +148,40 @@ describe('Basic Features', () => {
 
     expect(worker.pool).toHaveProperty('isTerminated', true)
   })
+  
+  it('warns if thread call queue becomes too large', (done) => {
+    const promises = []
+    
+    worker.pool.on('warn:all:queue:length', (length: number) => {
+      expect(length).toBeGreaterThan(1000)
+      done()
+    })
+    
+    for (let i = 0; i < 1100; i++) {
+      promises.push(worker.all.asyncFn('x', 5000))
+      //                  ^^^^
+    }
+    
+    Promise.all(promises).catch((err) => {})
+  })
+
+  it('warns if thread request queue becomes too large', (done) => {
+    const promises = []
+    
+    worker.pool.on('warn:queue:length', (length: number) => {
+      expect(length).toBeGreaterThan(1000)
+      done()
+    })
+    
+    for (let i = 0; i < 1100; i++) {
+      promises.push(worker.asyncFn('x', 5000))
+    }
+    
+    Promise.all(promises).catch((err) => {})
+  })
 
   it.todo('allows to call methods on the parent thread')
   it.todo('can call a method on a specific worker directly')
-  it.todo('warns if call queue becomes too large')
 })
 
 if (majorVersion >= 13) {

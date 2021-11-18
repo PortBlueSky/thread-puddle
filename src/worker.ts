@@ -124,7 +124,7 @@ parentPort.once('message', async (msg: InitMessage) => {
             port.postMessage(resultMsg)
           }
         } catch ({ message, stack }) {
-          debug(message)
+          debug('Worker method rejected with: ' + message)
           const resultMsg: ThreadErrorMessage = { 
             action: ThreadMessageAction.REJECT, 
             callbackId, 

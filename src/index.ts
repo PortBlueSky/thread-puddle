@@ -54,7 +54,8 @@ export type ThreadPoolOptions = {
   size?: number
   typecheck?: boolean
   workerOptions?: any // TODO: Use worker options type from node types
-  startupTimeout?: number
+  startupTimeout?: number,
+  queueWarnLength?: number;
 }
 
 export interface BaseWorker {
@@ -93,7 +94,8 @@ export async function createThreadPool<WorkerType> (workerPath: string, {
   size = 1,
   workerOptions = {},
   startupTimeout = 30000,
-  typecheck = false
+  typecheck = false,
+  queueWarnLength = 1000
 }: ThreadPoolOptions = {}): Promise<FilterAndWrap<WorkerType> & BaseWorker & { all: FilterAndWrap<WorkerType> }> {
   debugOut('carving out a puddle...')
 
@@ -141,7 +143,7 @@ export async function createThreadPool<WorkerType> (workerPath: string, {
 
   const onReady = (thread: Thread) => {
     if (thread.callQueue.length > 0) {
-      const { key, args, resolve, reject } = thread.callQueue.shift() as QueuedCall
+      const { key, args, resolve, reject } = thread.callQueue.shift()!
       callOnThread(thread, key, args, resolve, reject)
       return
     }
@@ -391,14 +393,18 @@ export async function createThreadPool<WorkerType> (workerPath: string, {
     }
 
     if (availableThreads.length > 0) {
-      const thread = availableThreads.shift()
+      const thread = availableThreads.shift()!
       debugOut('Resolving available worker %d', thread!.id)
-      return resolve(thread as Thread)
+      return resolve(thread)
     }
 
     const threadRequest: ThreadRequest = { resolve, reject }
     threadRequests.push(threadRequest)
     debugOut('Added worker request')
+
+    if (threadRequests.length > queueWarnLength) {
+      puddleInterface.emit('warn:queue:length', threadRequests.length)
+    }
   })
 
   const terminate = () => {
@@ -471,6 +477,10 @@ export async function createThreadPool<WorkerType> (workerPath: string, {
             return
           }
           thread.callQueue.push({ key, args, resolve, reject })
+
+          if (thread.callQueue.length > queueWarnLength) {
+            puddleInterface.emit('warn:all:queue:length', thread.callQueue.length)
+          }
         }))
       )
     }
