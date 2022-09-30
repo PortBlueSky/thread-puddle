@@ -57,19 +57,30 @@ export enum MessageAction {
 
 export enum MainMessageAction {
   CALL = 'call',
+  INIT = 'init'
 }
 
-export interface ThreadMessage {
+export type ThreadMessage = {
   action: MessageAction;
   callbackId: CallbackId;
   result: any;
 }
 
-export interface MainMessage {
-  action: MainMessageAction,
-  key: string,
-  callbackId: number,
+type BaseMainMessage = {
+  action: MainMessageAction
+}
+
+export type MainMessage = BaseMainMessage & {
+  key: string
+  callbackId: number
   args: any
+}
+
+export type InitMessage = BaseMainMessage & {
+  workerPath: string
+  port: MessagePort
+  id: ThreadId
+  parentId: ThreadId
 }
 
 export interface ThreadErrorMessage extends ThreadMessage {
@@ -395,12 +406,10 @@ export async function createThreadPool<WorkerType extends object> (workerPath: s
   })
   Object.defineProperties(puddleInterface, {
     size: {
-      get: () => threads.length,
-      writeable: false
+      get: () => threads.length
     },
     isTerminated: {
-      get: () => isTerminated,
-      writeable: false
+      get: () => isTerminated
     }
   })
 
