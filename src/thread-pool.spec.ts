@@ -1,9 +1,10 @@
 /* eslint-env jest */
 import path from 'path'
-import { createThreadPool, withTransfer, BaseWorkerType } from './index'
+import { createThreadPool, withTransfer } from './index'
 import debug from 'debug'
 import majorVersion from './major-node-version'
 import { ValidWorker } from './__tests__/workers/valid'
+import { ValidWorker as ValidWorkerClass } from './__tests__/workers/class'
 
 debug.enabled('puddle')
 
@@ -14,6 +15,7 @@ const noMethodWorkerPath = path.resolve(__dirname, './__tests__/workers/no-metho
 const noObjectWorkerPath = path.resolve(__dirname, './__tests__/workers/no-object.js')
 const invalidTsWorkerPath = path.resolve(__dirname, './__tests__/workers/invalid-ts.ts')
 const validTsWorkerPath = path.resolve(__dirname, './__tests__/workers/valid.ts')
+const classTsWorkerPath = path.resolve(__dirname, './__tests__/workers/class.ts')
 
 const countBy = (list: string[]) => list.reduce((acc: Record<string, number>, key: string) => {
   if (acc[key]) {
@@ -298,6 +300,16 @@ describe('Error Handling', () => {
 describe('ts-bridge', () => {
   it('actually spawns ts worker threads', async () => {
     const worker = await createThreadPool<ValidWorker>(validTsWorkerPath, {
+      size: 2
+    })
+    const result = await worker.someMethod()
+
+    expect(result).toBe('hello ts')
+    worker.pool.terminate()
+  })
+
+  it('actually spawns ts class worker threads', async () => {
+    const worker = await createThreadPool<ValidWorkerClass>(classTsWorkerPath, {
       size: 2
     })
     const result = await worker.someMethod()

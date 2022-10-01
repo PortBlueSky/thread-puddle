@@ -21,7 +21,7 @@ let __puddle__threadIdOffset: number = 1
 export type ThreadId = number
 export type CallbackId = number
 
-export interface Thread {
+export type Thread = {
   id: number;
   connected: boolean;
   worker: Worker;
@@ -83,12 +83,12 @@ export type InitMessage = BaseMainMessage & {
   parentId: ThreadId
 }
 
-export interface ThreadErrorMessage extends ThreadMessage {
+export type ThreadErrorMessage = ThreadMessage & {
   message: string;
   stack: string;
 }
 
-export interface ThreadPoolOptions {
+export type ThreadPoolOptions = {
   size?: number;
   workerOptions?: any; // TODO: Use worker options type from node types
   startupTimeout?: number;
@@ -110,16 +110,23 @@ type FilterType<Base, Condition> = Pick<Base, {
   [Key in keyof Base]: Base[Key] extends Condition ? Key : never
 }[keyof Base]>;
 
-type WrapReturnType<Base extends { [a: string]: (...a: any) => any }> = {
-  [Key in keyof Base]: Base[Key] extends (...a: any) => Promise<any> 
+type TypeWithMethods = Record<string | number | symbol,  (...a: any) => any | Promise<any>>
+export type AsyncMethod = (...param: any) => Promise<any>
+
+type WrapReturnType<Base extends TypeWithMethods> = {
+  [Key in keyof Base]: Base[Key] extends AsyncMethod
     ? Base[Key] 
     : (...a: Parameters<Base[Key]>) => Promise<ReturnType<Base[Key]>>;
 };
 
-type FilterAndWrap<Base> = WrapReturnType<FilterType<Base, Function>>
+// @ts-ignore
+// TODO: Fix usage of interface vs. type
+// Even though this complains, the type is inferred from the template correctly,
+// working for classes/interfaces and types
+type FilterAndWrap<Base> = WrapReturnType<FilterType<Required<Base>, Function>>
 
 
-export async function createThreadPool<WorkerType extends object> (workerPath: string, {
+export async function createThreadPool<WorkerType> (workerPath: string, {
   size = 1,
   workerOptions = {},
   startupTimeout = 30000

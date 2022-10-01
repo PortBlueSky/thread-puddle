@@ -1,7 +1,7 @@
 {
   "name": "thread-puddle",
   "description": "Turn any module into a worker thread",
-  "version": "0.3.2",
+  "version": "0.4.0-alpha.1",
   "main": "lib/index.js",
   "repository": {
     "type": "git",
@@ -10,22 +10,24 @@
   "author": "Sebastian Herrlinger <hasta84@gmail.com>",
   "license": "MIT",
   "devDependencies": {
-    "@types/debug": "^4.1.5",
-    "@types/jest": "^25.2.1",
-    "@types/node": "^13.13.0",
-    "@typescript-eslint/parser": "^2.28.0",
-    "coveralls": "^3.0.11",
-    "jest": "^25.1.0",
-    "standard": "^14.3.3",
-    "ts-jest": "^25.4.0",
-    "ts-node": "^8.8.2",
-    "typescript": "^3.8.3"
+    "@types/debug": "4.1.7",
+    "@types/jest": "29.1.1",
+    "@types/node": "18.7.23",
+    "@typescript-eslint/parser": "5.38.1",
+    "coveralls": "3.1.1",
+    "eslint": "8.24.0",
+    "jest": "29.1.2",
+    "standard": "17.0.0",
+    "ts-jest": "29.0.3",
+    "ts-node": "10.9.1",
+    "typescript": "4.8.4"
   },
   "scripts": {
-    "test": "jest --coverage",
-    "test-watch": "jest --coverage --watch",
+    "test": "jest",
+    "test-coverage": "jest --coverage",
+    "test-watch": "jest --watch",
     "build": "tsc",
-    "coveralls": "coveralls < coverage/lcov.info",
+    "coveralls": "yarn test-coverage && yarn coveralls < coverage/lcov.info",
     "prepack": "yarn build"
   },
   "dependencies": {
