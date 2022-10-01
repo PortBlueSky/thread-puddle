@@ -199,8 +199,7 @@ export async function createThreadPool<WorkerType> (workerPath: string, {
     let workerString = `require('${path.resolve(__dirname, 'worker')}')`
 
     if (hasTSNode()) {
-      // TODO: Use require(ts-node/register/transpile-only)
-      workerString = `require('ts-node').register()\n${workerString}`
+      workerString = `require('ts-node/register/transpile-only')\n${workerString}`
     }
 
     const worker = new Worker(workerString, { ...workerOptions, eval: true })
