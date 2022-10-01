@@ -6,6 +6,7 @@ import getCallsites from './utils/callsites'
 import { TransferableValue } from './Transferable'
 export { withTransfer } from './Transferable'
 import { MessagePort, Worker, MessageChannel, isMainThread } from 'worker_threads'
+import hasTSNode from './utils/has-ts-node'
 
 const { threadId: dynamicThreadId, debug: dynamicDebug } = require('./export-bridge')
 export const threadId = dynamicThreadId
@@ -149,6 +150,7 @@ export async function createThreadPool<WorkerType> (workerPath: string, {
 
   // Resolve relative worker path
   let resolvedWorkerPath = workerPath
+
   if (!path.isAbsolute(workerPath)) {
     let callsites = getCallsites()
     if (callsites) {
@@ -158,7 +160,7 @@ export async function createThreadPool<WorkerType> (workerPath: string, {
       resolvedWorkerPath = path.resolve(basePath, workerPath)
     }
   }
-  
+
   const threads: Thread[] = []
   const availableThreads: Thread[] = []
   const threadRequests: ThreadRequest[] = []
@@ -194,7 +196,14 @@ export async function createThreadPool<WorkerType> (workerPath: string, {
   const createThread = (id: ThreadId) => {
     debugOut('creating worker thread %s', id)
 
-    const worker = new Worker(workerProxyPath, workerOptions)
+    let workerString = `require('${path.resolve(__dirname, 'worker')}')`
+
+    if (hasTSNode()) {
+      // TODO: Use require(ts-node/register/transpile-only)
+      workerString = `require('ts-node').register()\n${workerString}`
+    }
+
+    const worker = new Worker(workerString, { ...workerOptions, eval: true })
     const { port1, port2 } = new MessageChannel()
     const thread: Thread = {
       id,
@@ -212,7 +221,7 @@ export async function createThreadPool<WorkerType> (workerPath: string, {
       thread.connected = true
     })
 
-    worker.on('exit', (code) => {
+    worker.on('exit', (code: number) => {
       debugOut('worker %d exited with code %d', id, code)
 
       if (puddleInterface.listenerCount('exit') > 0) {
