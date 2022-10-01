@@ -22,6 +22,6 @@
       "lib",
       "examples",
       "src/__tests__",
-      "src/**/*.spec.ts"
+      "**/*.spec.ts",
     ]
   }

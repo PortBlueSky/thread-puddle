@@ -8,21 +8,16 @@ import { ValidWorkerClass } from './__tests__/workers/class'
 
 debug.enabled('puddle')
 
-const basicWorkerPath = path.resolve(__dirname, './__tests__/workers/basic.js')
-const transferableWorkerPath = path.resolve(__dirname, './__tests__/workers/transferable.js')
-const startupFailWorkerPath = path.resolve(__dirname, './__tests__/workers/startup-fail.js')
-const noMethodWorkerPath = path.resolve(__dirname, './__tests__/workers/no-method.js')
-const noObjectWorkerPath = path.resolve(__dirname, './__tests__/workers/no-object.js')
-const invalidTsWorkerPath = path.resolve(__dirname, './__tests__/workers/invalid-ts.ts')
-const validTsWorkerPath = path.resolve(__dirname, './__tests__/workers/valid.ts')
-const classTsWorkerPath = path.resolve(__dirname, './__tests__/workers/class.ts')
+const basicWorkerPath = './__tests__/workers/basic.js'
+const transferableWorkerPath = './__tests__/workers/transferable.js'
+const startupFailWorkerPath = './__tests__/workers/startup-fail.js'
+const noObjectWorkerPath = './__tests__/workers/no-object.js'
+const invalidTsWorkerPath = './__tests__/workers/invalid-ts.ts'
+const validTsWorkerPath = './__tests__/workers/valid.ts'
+const classTsWorkerPath = './__tests__/workers/class.ts'
 
 const countBy = (list: string[]) => list.reduce((acc: Record<string, number>, key: string) => {
-  if (acc[key]) {
-    acc[key] += 1
-    return acc
-  }
-  acc[key] = 1
+  acc[key] = (acc[key] ?? 0) + 1
   return acc
 }, {})
 
@@ -30,7 +25,7 @@ describe('Basic Features', () => {
   let worker: any
 
   beforeEach(async () => {
-    worker = await createThreadPool<any>(basicWorkerPath, {
+    worker = await createThreadPool<any>('./__tests__/workers/basic.js', {
       size: 2,
       workerOptions: {
         workerData: {

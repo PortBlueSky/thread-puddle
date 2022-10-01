@@ -1,7 +1,9 @@
 import path from 'path'
 import { EventEmitter } from 'events'
 import createDebug from 'debug'
-import { TransferableValue, withTransfer } from './Transferable'
+import getCallsites from './callsites'
+
+import { TransferableValue } from './Transferable'
 export { withTransfer } from './Transferable'
 import { MessagePort, Worker, MessageChannel, isMainThread } from 'worker_threads'
 
@@ -144,6 +146,18 @@ export async function createThreadPool<WorkerType> (workerPath: string, {
   interface PoolProxyAllConstructor {
     new <T, H extends object, K extends WorkerType>(target: T, handler: ProxyHandler<H>): K
   }
+
+  // Resolve relative worker path
+  let resolvedWorkerPath = workerPath
+  if (!path.isAbsolute(workerPath)) {
+    let callsites = getCallsites()
+    if (callsites) {
+      callsites = callsites.filter((cs) => cs.getFileName())
+      const callerPath = callsites[1].getFileName()
+      const { dir: basePath} = path.parse(callerPath!)
+      resolvedWorkerPath = path.resolve(basePath, workerPath)
+    }
+  }
   
   const threads: Thread[] = []
   const availableThreads: Thread[] = []
@@ -257,15 +271,15 @@ export async function createThreadPool<WorkerType> (workerPath: string, {
       }
     })
 
-    const intiMsg: InitMessage = {
+    const initMsg: InitMessage = {
       action: MainMessageAction.INIT,
-      workerPath,
+      workerPath: resolvedWorkerPath,
       port: port1,
       id,
       parentId: threadId
     }
 
-    worker.postMessage(intiMsg, [port1])
+    worker.postMessage(initMsg, [port1])
     port2.on('message', (msg: ThreadMessage | ThreadErrorMessage) => {
       switch (msg.action) {
         case ThreadMessageAction.RESOLVE: {

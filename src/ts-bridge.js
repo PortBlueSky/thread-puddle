@@ -3,8 +3,10 @@ const createDebug = require('debug')
 
 const debug = createDebug('puddle:ts-bridge')
 
+// TODO: Only load ts-node if worker path resolves to .ts
 try {
   require.resolve('ts-node')
+  // TODO: Use require(ts-node/register/transpile-only)
   require('ts-node').register()
 } catch (e) {
   debug('ts-node not available')
