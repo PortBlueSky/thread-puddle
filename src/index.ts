@@ -48,7 +48,7 @@ export interface Callback {
   reject(error: Error): void;
 }
 
-export enum MessageAction {
+export enum ThreadMessageAction {
   RESOLVE = 'resolve',
   REJECT = 'reject',
   READY = 'ready',
@@ -61,7 +61,7 @@ export enum MainMessageAction {
 }
 
 export type ThreadMessage = {
-  action: MessageAction;
+  action: ThreadMessageAction;
   callbackId: CallbackId;
   result: any;
 }
@@ -94,7 +94,7 @@ export type ThreadPoolOptions = {
   startupTimeout?: number;
 }
 
-export interface BaseWorkerType {
+export interface BaseWorker {
   pool: PoolInterface;
 }
 
@@ -130,15 +130,15 @@ export async function createThreadPool<WorkerType> (workerPath: string, {
   size = 1,
   workerOptions = {},
   startupTimeout = 30000
-}: ThreadPoolOptions = {}): Promise<FilterAndWrap<WorkerType> & BaseWorkerType & { all: FilterAndWrap<WorkerType> }> {
+}: ThreadPoolOptions = {}): Promise<FilterAndWrap<WorkerType> & BaseWorker & { all: FilterAndWrap<WorkerType> }> {
   debugOut('carving out a puddle...')
 
-  type TargetWorkerType = BaseWorkerType & { all: FilterAndWrap<WorkerType> }
+  type TargetWorkerType = BaseWorker & { all: FilterAndWrap<WorkerType> }
   type ExtendedWorkerType = TargetWorkerType & FilterAndWrap<WorkerType>
 
   // Based on: https://github.com/Microsoft/TypeScript/issues/20846#issuecomment-582183737
   interface PoolProxyConstructor {
-    new <T, H extends object, K extends BaseWorkerType>(target: T, handler: ProxyHandler<H>): K
+    new <T, H extends object, K extends BaseWorker>(target: T, handler: ProxyHandler<H>): K
   }
 
   interface PoolProxyAllConstructor {
@@ -257,16 +257,18 @@ export async function createThreadPool<WorkerType> (workerPath: string, {
       }
     })
 
-    worker.postMessage({
-      action: 'init',
+    const intiMsg: InitMessage = {
+      action: MainMessageAction.INIT,
       workerPath,
       port: port1,
       id,
       parentId: threadId
-    }, [port1])
+    }
+
+    worker.postMessage(intiMsg, [port1])
     port2.on('message', (msg: ThreadMessage | ThreadErrorMessage) => {
       switch (msg.action) {
-        case MessageAction.RESOLVE: {
+        case ThreadMessageAction.RESOLVE: {
           debugOut('worker %d resolved callback %d', id, msg.callbackId)
           const callbacks = threadCallbacks.get(id)
           const callback = callbacks!.get(msg.callbackId)
@@ -275,7 +277,7 @@ export async function createThreadPool<WorkerType> (workerPath: string, {
           callback!.resolve(msg.result)
           break
         }
-        case MessageAction.REJECT: {
+        case ThreadMessageAction.REJECT: {
           const errorMsg = msg as ThreadErrorMessage
           const callbacks = threadCallbacks.get(id)
           const callback = callbacks!.get(errorMsg.callbackId)
@@ -286,11 +288,11 @@ export async function createThreadPool<WorkerType> (workerPath: string, {
           callback!.reject(err)
           break
         }
-        case MessageAction.READY: {
+        case ThreadMessageAction.READY: {
           onReady(thread)
           break
         }
-        case MessageAction.STARTUP_ERROR: {
+        case ThreadMessageAction.STARTUP_ERROR: {
           if (threadRequests.length > 0) {
             const errorMsg = msg as ThreadErrorMessage
             const request = threadRequests.shift()

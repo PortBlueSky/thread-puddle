@@ -37,23 +37,13 @@ parentPort.once('message', async (msg: InitMessage) => {
     }
 
     const workerKeys = Object.keys(worker)
-    isCommonJS = workerKeys.length === 1 && workerKeys[0] === 'default'
+    isCommonJS = workerKeys.includes('default')
 
     if (isCommonJS) {
       worker = worker.default
       if (!(worker instanceof Object)) {
         throw new Error(`Worker should export an object, got ${worker}`)
       }
-    }
-
-    let callables = 0
-    for (const key of Object.keys(worker!)) {
-      if (typeof worker![key] === 'function') {
-        callables++
-      }
-    }
-    if (callables === 0) {
-      throw new Error('Worker should export at least one method')
     }
   } catch ({ message, stack }) {
     port.postMessage({ action: 'startup-error', message, stack })

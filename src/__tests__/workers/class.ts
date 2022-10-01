@@ -1,7 +1,6 @@
-export class ValidWorker {
-  someMethod() { return 'hello ts' }
+export class ValidWorkerClass {
+  someMethod() { return 'hello ts class' }
   moreMethod() { return 1 }
 }
-const ex = new ValidWorker()
 
-export default ex
+export default new ValidWorkerClass()
