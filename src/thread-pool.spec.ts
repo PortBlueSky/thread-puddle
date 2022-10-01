@@ -2,7 +2,7 @@
 import path from 'path'
 import { createThreadPool, withTransfer } from './index'
 import debug from 'debug'
-import majorVersion from './major-node-version'
+import majorVersion from './utils/major-node-version'
 import { ValidWorker } from './__tests__/workers/valid'
 import { ValidWorkerClass } from './__tests__/workers/class'
 

@@ -1,7 +1,7 @@
 import path from 'path'
 import { EventEmitter } from 'events'
 import createDebug from 'debug'
-import getCallsites from './callsites'
+import getCallsites from './utils/callsites'
 
 import { TransferableValue } from './Transferable'
 export { withTransfer } from './Transferable'

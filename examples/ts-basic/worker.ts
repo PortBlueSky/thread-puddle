@@ -3,6 +3,6 @@ export interface IMyWorker {
   say(): string;
 }
 
-module.exports = {
+export default {
   say: () => 'Hello!'
-} as IMyWorker
+}
