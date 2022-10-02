@@ -1,7 +1,7 @@
 import { parentPort } from 'worker_threads'
 import createDebug from 'debug'
 import { TransferableValue } from './Transferable'
-import { MainMessage, InitMessage } from '.'
+import { BaseMainMessage, CallMessage, InitMessage, ThreadFunctionMessage, ThreadMessageAction } from './types/messages'
 
 const dynamicExports = require('./export-bridge')
 
@@ -46,13 +46,14 @@ parentPort.once('message', async (msg: InitMessage) => {
       }
     }
   } catch ({ message, stack }) {
-    port.postMessage({ action: 'startup-error', message, stack })
+    port.postMessage({ action: ThreadMessageAction.STARTUP_ERROR, message, stack })
     return
   }
 
-  port.on('message', async ({ action, key, args, callbackId }: MainMessage) => {
-    switch (action) {
+  port.on('message', async (msg: BaseMainMessage) => {
+    switch (msg.action) {
       case 'call': {
+        const { key, args, callbackId, argFunctionPositions } = msg as CallMessage
         debug('calling worker thread method %s', key)
 
         try {
@@ -61,25 +62,44 @@ parentPort.once('message', async (msg: InitMessage) => {
             debug('%s is not a function', key)
             throw new Error(`"${key}" is not a function in this worker thread`)
           }
+
+          if (argFunctionPositions.length > 0) {
+            for (const fnArgPos of argFunctionPositions) {
+              const { id } = args[fnArgPos]
+              // TODO: Register and use finalizer to de-reference on main when gc'd
+              args[fnArgPos] = (...cbArgs: any[]) => {
+                // TODO: Make transferables work here
+                const fnMsg: ThreadFunctionMessage = {
+                  action: ThreadMessageAction.CALL_FUNCTION,
+                  functionId: id,
+                  key,
+                  args: cbArgs
+                }
+                port.postMessage(fnMsg)
+              }
+            }
+          }
+
           const result = await worker![key](...args)
 
           debug('worker done with thread method %s', key)
 
           if (result instanceof TransferableValue) {
             port.postMessage({
-              action: 'resolve',
+              action: ThreadMessageAction.RESOLVE,
               callbackId,
               result: result.obj
             }, result.transferables)
           } else {
-            port.postMessage({ action: 'resolve', callbackId, result })
+            port.postMessage({ action: ThreadMessageAction.RESOLVE, callbackId, result })
           }
         } catch ({ message, stack }) {
           debug(message)
-          port.postMessage({ action: 'reject', callbackId, message, stack })
+          port.postMessage({ action: ThreadMessageAction.REJECT, callbackId, message, stack })
         }
         break
       }
+
       default: {
         throw new Error(`Unknown action "${msg.action}" for worker thread`)
       }

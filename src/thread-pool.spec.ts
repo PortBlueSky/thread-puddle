@@ -5,6 +5,7 @@ import debug from 'debug'
 import majorVersion from './utils/major-node-version'
 import { ValidWorker } from './__tests__/workers/valid'
 import { ValidWorkerClass } from './__tests__/workers/class'
+import { WorkerWithCallback } from './__tests__/workers/callback'
 
 debug.enabled('puddle')
 
@@ -375,6 +376,21 @@ describe('Termination', () => {
     const err = await worker.asyncFn('value', 100).catch((err: Error) => err)
 
     expect(err).toHaveProperty('message', 'Worker pool already terminated.')
+  })
+})
+
+describe('Callbacks', () => {
+  it('can call a callback function on the main thread', async () => {
+    const worker = await createThreadPool<WorkerWithCallback>('./__tests__/workers/callback')
+
+    const callback = jest.fn()
+    await worker.withCallback(1, 2, callback)
+    worker.pool.terminate()
+
+    await new Promise<void>((resolve) => setTimeout(() => resolve(), 1000))
+
+    expect(callback).toHaveBeenCalledTimes(1)
+    expect(callback).toHaveBeenCalledWith(3)
   })
 })
 

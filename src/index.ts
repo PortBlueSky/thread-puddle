@@ -7,6 +7,8 @@ import { TransferableValue } from './Transferable'
 export { withTransfer } from './Transferable'
 import { MessagePort, Worker, MessageChannel, isMainThread } from 'worker_threads'
 import hasTSNode from './utils/has-ts-node'
+import { CallbackId, ThreadId, ThreadMethodKey } from './types/general'
+import { CallMessage, InitMessage, MainMessageAction, ThreadCallbackMessage, ThreadErrorMessage, ThreadFunctionMessage, ThreadMessageAction } from './types/messages'
 
 const { threadId: dynamicThreadId, debug: dynamicDebug } = require('./export-bridge')
 export const threadId = dynamicThreadId
@@ -21,11 +23,9 @@ if (!isMainThread) {
 const workerProxyPath = path.resolve(__dirname, 'ts-bridge.js')
 let __puddle__threadIdOffset: number = 1
 
-export type ThreadId = number
-export type CallbackId = number
 
 export type Thread = {
-  id: number
+  id: ThreadId
   connected: boolean
   worker: Worker
   port: MessagePort
@@ -35,7 +35,7 @@ export type Thread = {
 }
 
 export interface QueuedCall {
-  key: string | number | symbol
+  key: ThreadMethodKey
   args: Array<any>
   resolve: (result: any) => void,
   reject: (error: Error) => void
@@ -49,46 +49,6 @@ export interface ThreadRequest {
 export interface Callback {
   resolve(thread: Thread): void
   reject(error: Error): void
-}
-
-export enum ThreadMessageAction {
-  RESOLVE = 'resolve',
-  REJECT = 'reject',
-  READY = 'ready',
-  STARTUP_ERROR = 'startup-error'
-}
-
-export enum MainMessageAction {
-  CALL = 'call',
-  INIT = 'init'
-}
-
-export type ThreadMessage = {
-  action: ThreadMessageAction
-  callbackId: CallbackId
-  result: any
-}
-
-type BaseMainMessage = {
-  action: MainMessageAction
-}
-
-export type MainMessage = BaseMainMessage & {
-  key: string
-  callbackId: number
-  args: any
-}
-
-export type InitMessage = BaseMainMessage & {
-  workerPath: string
-  port: MessagePort
-  id: ThreadId
-  parentId: ThreadId
-}
-
-export type ThreadErrorMessage = ThreadMessage & {
-  message: string
-  stack: string
 }
 
 export type ThreadPoolOptions = {
@@ -169,6 +129,8 @@ export async function createThreadPool<WorkerType> (workerPath: string, {
   const availableThreads: Thread[] = []
   const threadRequests: ThreadRequest[] = []
   const threadCallbacks: Map<ThreadId, Map<CallbackId, Callback>> = new Map<ThreadId,  Map<CallbackId, Callback>>()
+  const mainFunctions = new Map<ThreadMethodKey, { [id: number]: Function }>()
+
   let callbackCount = 0
   let isTerminated = false
 
@@ -298,10 +260,12 @@ export async function createThreadPool<WorkerType> (workerPath: string, {
     }
 
     worker.postMessage(initMsg, [port1])
-    port2.on('message', (msg: ThreadMessage | ThreadErrorMessage) => {
+    port2.on('message', (msg: ThreadCallbackMessage | ThreadErrorMessage | ThreadFunctionMessage) => {
       switch (msg.action) {
         case ThreadMessageAction.RESOLVE: {
+          msg = msg as ThreadCallbackMessage
           debugOut('worker %d resolved callback %d', id, msg.callbackId)
+          
           const callbacks = threadCallbacks.get(id)
           const callback = callbacks!.get(msg.callbackId)
           callbacks!.delete(msg.callbackId)
@@ -309,8 +273,11 @@ export async function createThreadPool<WorkerType> (workerPath: string, {
           callback!.resolve(msg.result)
           break
         }
+
         case ThreadMessageAction.REJECT: {
           const errorMsg = msg as ThreadErrorMessage
+          debugOut('worker %d rejected callback %d', id, errorMsg.callbackId)
+          
           const callbacks = threadCallbacks.get(id)
           const callback = callbacks!.get(errorMsg.callbackId)
           callbacks!.delete(errorMsg.callbackId)
@@ -320,10 +287,23 @@ export async function createThreadPool<WorkerType> (workerPath: string, {
           callback!.reject(err)
           break
         }
+
+        case ThreadMessageAction.CALL_FUNCTION: {
+          msg = msg as ThreadFunctionMessage
+          debugOut('worker %d calling function %s[%d]', id, msg.key, msg.functionId)
+          
+          const fnHolder = mainFunctions.get(msg.key)
+          if (fnHolder) {
+            fnHolder[msg.functionId](...msg.args)
+          }
+          break
+        }
+
         case ThreadMessageAction.READY: {
           onReady(thread)
           break
         }
+
         case ThreadMessageAction.STARTUP_ERROR: {
           if (threadRequests.length > 0) {
             const errorMsg = msg as ThreadErrorMessage
@@ -334,6 +314,7 @@ export async function createThreadPool<WorkerType> (workerPath: string, {
           }
           break
         }
+
         default: {
           throw new Error(`Unknown worker pool action "${msg.action}"`)
         }
@@ -358,7 +339,7 @@ export async function createThreadPool<WorkerType> (workerPath: string, {
 
   function callOnThread (
     thread: Thread, 
-    key: string | number | symbol, 
+    key: ThreadMethodKey, 
     args: Array<any>, 
     resolve: (thread: Thread) => void, 
     reject: (error: Error) => void
@@ -368,21 +349,37 @@ export async function createThreadPool<WorkerType> (workerPath: string, {
     const callbackId = callbackCount++
     threadCallbacks.get(thread.id)!.set(callbackId, { resolve, reject })
 
+    let functionsInArgs = 0
+    let argFunctionPositions: number[] = []
     const transferables: Array<MessagePort | ArrayBuffer> = []
-    const iteratedArgs = args.map((arg: any) => {
+    const iteratedArgs = args.map((arg: any, index: number) => {
       if (arg instanceof TransferableValue) {
         transferables.push(...arg.transferables)
         return arg.obj
       }
+      if (typeof arg === 'function') {
+        functionsInArgs += 1
+        argFunctionPositions.push(index)
+        if (!mainFunctions.has(key)) {
+          mainFunctions.set(key, {})
+        }
+        const fnHolder = mainFunctions.get(key)!
+        console.log('IS SAME?', fnHolder[functionsInArgs] === arg)
+        fnHolder[functionsInArgs] = arg
+        return { id: functionsInArgs } 
+      }
       return arg
     })
 
-    thread.port.postMessage({
-      action: 'call',
+    const msg: CallMessage = {
+      action: MainMessageAction.CALL,
       key,
       callbackId,
-      args: iteratedArgs
-    }, transferables)
+      args: iteratedArgs,
+      argFunctionPositions
+    }
+
+    thread.port.postMessage(msg, transferables)
   }
 
   const getAvailableThread = () => new Promise<Thread>((resolve, reject) => {
