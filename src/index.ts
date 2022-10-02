@@ -163,6 +163,8 @@ export async function createThreadPool<WorkerType> (workerPath: string, {
     }
   }
 
+  const { ext: resolvedWorkerExtension } = path.parse(require.resolve(resolvedWorkerPath))
+
   const threads: Thread[] = []
   const availableThreads: Thread[] = []
   const threadRequests: ThreadRequest[] = []
@@ -198,9 +200,11 @@ export async function createThreadPool<WorkerType> (workerPath: string, {
   const createThread = (id: ThreadId) => {
     debugOut('creating worker thread %s', id)
 
-    let workerString = `require('${path.resolve(__dirname, 'worker')}')`
+    const bridgeWorkerPath = path.resolve(__dirname, 'worker')
+    const { ext: bridgeWorkerExtension } = path.parse(require.resolve(bridgeWorkerPath))
+    let workerString = `require('${bridgeWorkerPath}')`
 
-    if (hasTSNode()) {
+    if (hasTSNode() && [bridgeWorkerExtension, resolvedWorkerExtension].includes('.ts')) {
       if (typecheck) {
         workerString = `require('ts-node').register()\n${workerString}`
       } else {
