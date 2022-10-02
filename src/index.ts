@@ -25,30 +25,30 @@ export type ThreadId = number
 export type CallbackId = number
 
 export type Thread = {
-  id: number;
-  connected: boolean;
-  worker: Worker;
-  port: MessagePort;
-  error: Error | boolean;
-  callQueue: QueuedCall[];
-  busy: boolean;
+  id: number
+  connected: boolean
+  worker: Worker
+  port: MessagePort
+  error: Error | boolean
+  callQueue: QueuedCall[]
+  busy: boolean
 }
 
 export interface QueuedCall {
-  key: string | number | symbol;
-  args: Array<any>;
+  key: string | number | symbol
+  args: Array<any>
   resolve: (result: any) => void,
   reject: (error: Error) => void
 }
 
 export interface ThreadRequest {
-  resolve(thread: Thread): void;
-  reject(error: Error): void;
+  resolve(thread: Thread): void
+  reject(error: Error): void
 }
 
 export interface Callback {
-  resolve(thread: Thread): void;
-  reject(error: Error): void;
+  resolve(thread: Thread): void
+  reject(error: Error): void
 }
 
 export enum ThreadMessageAction {
@@ -64,9 +64,9 @@ export enum MainMessageAction {
 }
 
 export type ThreadMessage = {
-  action: ThreadMessageAction;
-  callbackId: CallbackId;
-  result: any;
+  action: ThreadMessageAction
+  callbackId: CallbackId
+  result: any
 }
 
 type BaseMainMessage = {
@@ -87,24 +87,25 @@ export type InitMessage = BaseMainMessage & {
 }
 
 export type ThreadErrorMessage = ThreadMessage & {
-  message: string;
-  stack: string;
+  message: string
+  stack: string
 }
 
 export type ThreadPoolOptions = {
-  size?: number;
-  workerOptions?: any; // TODO: Use worker options type from node types
-  startupTimeout?: number;
+  size?: number
+  typecheck?: boolean
+  workerOptions?: any // TODO: Use worker options type from node types
+  startupTimeout?: number
 }
 
 export interface BaseWorker {
-  pool: PoolInterface;
+  pool: PoolInterface
 }
 
 export interface PoolInterface extends EventEmitter {
-  terminate(): void;
-  size: number;
-  isTerminated: boolean;
+  terminate(): void
+  size: number
+  isTerminated: boolean
 }
 
 type ProxyWorkerTarget = Record<string, any>
@@ -132,7 +133,8 @@ type FilterAndWrap<Base> = WrapReturnType<FilterType<Required<Base>, Function>>
 export async function createThreadPool<WorkerType> (workerPath: string, {
   size = 1,
   workerOptions = {},
-  startupTimeout = 30000
+  startupTimeout = 30000,
+  typecheck = false
 }: ThreadPoolOptions = {}): Promise<FilterAndWrap<WorkerType> & BaseWorker & { all: FilterAndWrap<WorkerType> }> {
   debugOut('carving out a puddle...')
 
@@ -199,7 +201,11 @@ export async function createThreadPool<WorkerType> (workerPath: string, {
     let workerString = `require('${path.resolve(__dirname, 'worker')}')`
 
     if (hasTSNode()) {
-      workerString = `require('ts-node/register/transpile-only')\n${workerString}`
+      if (typecheck) {
+        workerString = `require('ts-node').register()\n${workerString}`
+      } else {
+        workerString = `require('ts-node/register/transpile-only')\n${workerString}`
+      }
     }
 
     const worker = new Worker(workerString, { ...workerOptions, eval: true })

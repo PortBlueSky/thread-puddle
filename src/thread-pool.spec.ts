@@ -315,9 +315,11 @@ describe('ts-bridge', () => {
 
   it('forwards ts errors to main thread', async () => {
     const startupError = await createThreadPool(invalidTsWorkerPath, {
-      size: 2
+      size: 2,
+      typecheck: true
     }).catch(err => err)
 
+    expect(startupError).toBeInstanceOf(Error)
     expect(startupError).toHaveProperty('message', '⨯ Unable to compile TypeScript:\nsrc/__tests__/workers/invalid-ts.ts(3,36): error TS2365: Operator \'+\' cannot be applied to types \'object\' and \'number\'.\n')
   })
 })

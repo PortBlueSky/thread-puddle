@@ -28,9 +28,9 @@ export interface IMyWorker {
   say(): string;
 }
 
-module.exports = {
-  say: () => 'Hello!'
-} as IMyWorker
+export default = {
+  say: () => console.log('Hello!')
+}
 ```
 
 ```ts
@@ -38,18 +38,13 @@ module.exports = {
 import { createThreadPool } from '../../lib'
 import { IMyWorker } from './worker'
 
-const worker = await createThreadPool<IMyWorker>('./worker', {
-  size: 2
-})
-
-const result = await worker.say()
-
-console.log(result) // -> "Hello!"
+const worker = await createThreadPool<IMyWorker>('./worker')
+const result = await worker.say() // -> "Hello!"
 
 worker.pool.terminate()
 ```
 
-This and more examples in plain JS can be found in the `examples` directory.
+This and more examples can be found in the `examples` directory.
 
 ## Typing
 
@@ -72,10 +67,6 @@ interface Calculations {
   crunchNumbers(data: number[]): Promise<number>;
   pool: PoolInterface
 }
-
-// Expressed as:
-const worker: WrapReturnType<Pick<ValidWorker, "crunchNumbers">> & BaseWorkerType
-
 ```
 
 
@@ -92,6 +83,7 @@ Arguments:
   - `size`- the number of worker threads to be created in the pool for the given module. Defaults to `1`.
   - `workerOptions` - will be used as options for the [worker thread constructor](https://nodejs.org/dist/latest-v12.x/docs/api/worker_threads.html#worker_threads_new_worker_filename_options). Defaults to `{}`.
   - `startupTimeout` - if a worker thread cannot be started within this timout in milliseconds, the pool creation will fail and reject with a timout error. Defaults to `30000`.
+  - `typecheck` - In development `ts-node` is used, which by default runs `transpile-only` mode. To get type checks, set this to `true`.
 
 If the pool size is `> 1`, method calls will be forwarded to the next available worker. If all workers are busy, the method calls will be queued. A worker will handle one method call at any time only.
 

@@ -4,5 +4,5 @@ export interface IMyWorker {
 }
 
 export default {
-  say: () => 'Hello!'
+  say: () => console.log('Hello!')
 }
