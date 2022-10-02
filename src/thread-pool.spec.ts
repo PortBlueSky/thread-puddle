@@ -6,6 +6,8 @@ import majorVersion from './utils/major-node-version'
 import { ValidWorker } from './__tests__/workers/valid'
 import { ValidWorkerClass } from './__tests__/workers/class'
 import { WorkerWithCallback } from './__tests__/workers/callback'
+import { WorkerWithEmitter } from './__tests__/workers/eventemitter'
+import { ChainWorkerClass } from './__tests__/workers/this'
 
 debug.enabled('puddle')
 
@@ -379,6 +381,17 @@ describe('Termination', () => {
   })
 })
 
+describe('Chaining', () => {
+  it('returns the proxy when a worker object returns itself', async () => {
+    const worker = await createThreadPool<ChainWorkerClass>('./__tests__/workers/this')
+
+    const result = await (await worker.chain()).follow()
+    worker.pool.terminate()
+
+    expect(result).toEqual('works')
+  })
+})
+
 describe('Callbacks', () => {
   it('can call a callback function on the main thread', async () => {
     const worker = await createThreadPool<WorkerWithCallback>('./__tests__/workers/callback')
@@ -408,6 +421,20 @@ describe('Callbacks', () => {
     expect(callback1).toHaveBeenCalledWith(3)
     expect(callback2).toHaveBeenCalledTimes(1)
     expect(callback2).toHaveBeenCalledWith(4)
+  })
+
+  it('handles an exposed event emitter', async () => {
+    const worker = await createThreadPool<WorkerWithEmitter>('./__tests__/workers/eventemitter')
+
+    const callback = jest.fn()
+    await worker.on('some:event', callback)
+    await worker.triggerSomething(10, 20)
+    
+    await new Promise<void>((resolve) => setTimeout(() => resolve(), 1000))
+    worker.pool.terminate()
+
+    expect(callback).toHaveBeenCalledTimes(1)
+    expect(callback).toHaveBeenCalledWith(30)
   })
 })
 

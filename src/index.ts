@@ -491,8 +491,11 @@ export async function createThreadPool<WorkerType> (workerPath: string, {
     all: allWorkersInterface as FilterAndWrap<WorkerType>
   }
 
+  // Intermediate, so the proxy can return itself
+  let proxy: ExtendedWorkerType
+  
   const handler = {
-    get: (target: ProxyWorkerTarget, key: string) => {
+    get: (proxyTarget: ProxyWorkerTarget, key: string) => {
       // NOTE: If the proxy is returned from an async function,
       // the engine checks if it is a thenable by checking existence of a then method
       if (key === 'then') {
@@ -500,16 +503,25 @@ export async function createThreadPool<WorkerType> (workerPath: string, {
       }
 
       if (key === 'pool' || key === 'all') {
-        return target[key]
+        return proxyTarget[key]
       }
 
-      return (...args: any[]) => new Promise((resolve, reject) => {
-        getAvailableThread()
-          .then((thread: Thread) => callOnThread(thread, key, args, resolve, reject))
-          .catch(err => reject(err))
-      })
+      return async (...args: any[]) => {
+        const result = await new Promise((resolve, reject) => {
+          getAvailableThread()
+            .then((thread: Thread) => callOnThread(thread, key, args, resolve, reject))
+            .catch(err => reject(err))
+        })
+        
+        if (result === '__THIS__') {
+          return proxy
+        }
+
+        return result
+      }
     }
   }
 
-  return new PoolProxy<typeof target, typeof handler, ExtendedWorkerType> (target, handler)
+  proxy = new PoolProxy<typeof target, typeof handler, ExtendedWorkerType> (target, handler)
+  return proxy
 }

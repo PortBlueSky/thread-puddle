@@ -49,7 +49,8 @@ export type ThreadFunctionMessage = BaseThreadMessage & {
   args: any[]
 }
 
-export type ThreadErrorMessage = ThreadCallbackMessage & {
+export type ThreadErrorMessage = BaseThreadMessage & {
+  callbackId: CallbackId
   message: string
   stack: string
 }

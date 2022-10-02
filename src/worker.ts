@@ -1,7 +1,15 @@
 import { parentPort } from 'worker_threads'
 import createDebug from 'debug'
 import { TransferableValue } from './Transferable'
-import { BaseMainMessage, CallMessage, InitMessage, ThreadFunctionMessage, ThreadMessageAction } from './types/messages'
+import { 
+  BaseMainMessage,
+  CallMessage,
+  InitMessage,
+  ThreadCallbackMessage,
+  ThreadErrorMessage,
+  ThreadFunctionMessage,
+  ThreadMessageAction 
+} from './types/messages'
 
 const dynamicExports = require('./export-bridge')
 
@@ -13,13 +21,13 @@ parentPort.once('message', async (msg: InitMessage) => {
   if (msg.action !== 'init') {
     return
   }
-    
+
   const { workerPath, port, id, parentId } = msg
 
   let debug = createDebug(`puddle:thread:${id}`)
   if (parentId) {
     debug = createDebug(`puddle:parent:${parentId}:thread:${id}`)
-  } 
+  }
 
   debug('Initializing worker thread...')
   let worker: Record<string, Function | any> | null = null
@@ -80,22 +88,38 @@ parentPort.once('message', async (msg: InitMessage) => {
             }
           }
 
-          const result = await worker![key](...args)
+          let result = await worker![key](...args)
 
           debug('worker done with thread method %s', key)
 
+          if (result === worker) {
+            result = '__THIS__'
+          } 
+          
           if (result instanceof TransferableValue) {
-            port.postMessage({
+            const resultMsg: ThreadCallbackMessage = {
               action: ThreadMessageAction.RESOLVE,
               callbackId,
               result: result.obj
-            }, result.transferables)
+            }
+            port.postMessage(resultMsg, result.transferables)
           } else {
-            port.postMessage({ action: ThreadMessageAction.RESOLVE, callbackId, result })
+            const resultMsg: ThreadCallbackMessage = { 
+              action: ThreadMessageAction.RESOLVE, 
+              callbackId, 
+              result 
+            }
+            port.postMessage(resultMsg)
           }
         } catch ({ message, stack }) {
           debug(message)
-          port.postMessage({ action: ThreadMessageAction.REJECT, callbackId, message, stack })
+          const resultMsg: ThreadErrorMessage = { 
+            action: ThreadMessageAction.REJECT, 
+            callbackId, 
+            message: message as string, 
+            stack: stack as string 
+          }
+          port.postMessage(resultMsg)
         }
         break
       }
