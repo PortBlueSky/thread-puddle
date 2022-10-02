@@ -7,9 +7,11 @@ import {
   InitMessage,
   ThreadCallbackMessage,
   ThreadErrorMessage,
+  ThreadFreeFunctionMessage,
   ThreadFunctionMessage,
   ThreadMessageAction 
 } from './types/messages'
+import { FunctionId, ThreadMethodKey } from './types/general'
 
 const dynamicExports = require('./export-bridge')
 
@@ -58,6 +60,15 @@ parentPort.once('message', async (msg: InitMessage) => {
     return
   }
 
+  const functionRegistry = new FinalizationRegistry(({id, key }: { id: FunctionId, key: ThreadMethodKey }) => {
+    const fnMsg: ThreadFreeFunctionMessage = {
+      action: ThreadMessageAction.FREE_FUNCTION,
+      functionId: id,
+      key
+    }
+    port.postMessage(fnMsg)
+  })
+
   port.on('message', async (msg: BaseMainMessage) => {
     switch (msg.action) {
       case 'call': {
@@ -74,8 +85,7 @@ parentPort.once('message', async (msg: InitMessage) => {
           if (argFunctionPositions.length > 0) {
             for (const fnArgPos of argFunctionPositions) {
               const { id } = args[fnArgPos]
-              // TODO: Register and use finalizer to de-reference on main when gc'd
-              args[fnArgPos] = (...cbArgs: any[]) => {
+              const fn = (...cbArgs: any[]) => {
                 // TODO: Make transferables work here
                 const fnMsg: ThreadFunctionMessage = {
                   action: ThreadMessageAction.CALL_FUNCTION,
@@ -85,6 +95,8 @@ parentPort.once('message', async (msg: InitMessage) => {
                 }
                 port.postMessage(fnMsg)
               }
+              functionRegistry.register(fn, id, fn)
+              args[fnArgPos] = fn
             }
           }
 

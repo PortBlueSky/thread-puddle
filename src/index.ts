@@ -8,7 +8,7 @@ export { withTransfer } from './Transferable'
 import { MessagePort, Worker, MessageChannel, isMainThread } from 'worker_threads'
 import hasTSNode from './utils/has-ts-node'
 import { CallbackId, ThreadId, ThreadMethodKey } from './types/general'
-import { CallMessage, InitMessage, MainMessageAction, ThreadCallbackMessage, ThreadErrorMessage, ThreadFunctionMessage, ThreadMessageAction } from './types/messages'
+import { BaseThreadMessage, CallMessage, InitMessage, isThreadCallbackMessage, isThreadErrorMessage, isThreadFreeFunctionMessage, isThreadFunctionMessage, isThreadReadyMessage, isThreadStartupErrorMessage, MainMessageAction, ThreadCallbackMessage, ThreadErrorMessage, ThreadFreeFunctionMessage, ThreadFunctionMessage, ThreadMessageAction, ThreadReadyMessage } from './types/messages'
 import { createSequence } from './utils/sequence'
 
 const { threadId: dynamicThreadId, debug: dynamicDebug } = require('./export-bridge')
@@ -262,65 +262,61 @@ export async function createThreadPool<WorkerType> (workerPath: string, {
     }
 
     worker.postMessage(initMsg, [port1])
-    port2.on('message', (msg: ThreadCallbackMessage | ThreadErrorMessage | ThreadFunctionMessage) => {
-      switch (msg.action) {
-        case ThreadMessageAction.RESOLVE: {
-          msg = msg as ThreadCallbackMessage
-          debugOut('worker %d resolved callback %d', id, msg.callbackId)
-          
-          const callbacks = threadCallbacks.get(id)
-          const callback = callbacks!.get(msg.callbackId)
-          callbacks!.delete(msg.callbackId)
-          onReady(thread)
-          callback!.resolve(msg.result)
-          break
-        }
 
-        case ThreadMessageAction.REJECT: {
-          const errorMsg = msg as ThreadErrorMessage
-          debugOut('worker %d rejected callback %d', id, errorMsg.callbackId)
+    port2.on('message', (
+      msg: BaseThreadMessage
+    ) => {
+      if (isThreadCallbackMessage(msg)) {
+        debugOut('worker %d resolved callback %d', id, msg.callbackId)
+        
+        const callbacks = threadCallbacks.get(id)
+        const callback = callbacks!.get(msg.callbackId)
+        callbacks!.delete(msg.callbackId)
+        onReady(thread)
+        callback!.resolve(msg.result)
+        return
+      } else if (isThreadErrorMessage(msg)) {
+        debugOut('worker %d rejected callback %d', id, msg.callbackId)
+        
+        const callbacks = threadCallbacks.get(id)
+        const callback = callbacks!.get(msg.callbackId)
+        callbacks!.delete(msg.callbackId)
+        const err = new Error(msg.message)
+        err.stack = msg.stack
+        onReady(thread)
+        callback!.reject(err)
+        return
+      } else if (isThreadFunctionMessage(msg)) {
+        debugOut('worker %d calling function %s[%d]', id, msg.key, msg.functionId)
+        
+        const fnHolder = mainFunctions.get(msg.key)
+        if (fnHolder) {
+          fnHolder[msg.functionId](...msg.args)
+        }
+        return
+      } else if (isThreadFreeFunctionMessage(msg)) {
+        debugOut('worker %d calling free %s[%d]', id, msg.key, msg.functionId)
           
-          const callbacks = threadCallbacks.get(id)
-          const callback = callbacks!.get(errorMsg.callbackId)
-          callbacks!.delete(errorMsg.callbackId)
+        const fnHolder = mainFunctions.get(msg.key)
+        if (fnHolder) {
+          delete fnHolder[msg.functionId]
+        }
+        return
+      } else if (isThreadReadyMessage(msg)) {
+        onReady(thread)
+        return
+      } else if (isThreadStartupErrorMessage(msg)) {
+        if (threadRequests.length > 0) {
+          const errorMsg = msg as ThreadErrorMessage
+          const request = threadRequests.shift()
           const err = new Error(errorMsg.message)
           err.stack = errorMsg.stack
-          onReady(thread)
-          callback!.reject(err)
-          break
+          request!.reject(err)
         }
+        return
+      } 
 
-        case ThreadMessageAction.CALL_FUNCTION: {
-          msg = msg as ThreadFunctionMessage
-          debugOut('worker %d calling function %s[%d]', id, msg.key, msg.functionId)
-          
-          const fnHolder = mainFunctions.get(msg.key)
-          if (fnHolder) {
-            fnHolder[msg.functionId](...msg.args)
-          }
-          break
-        }
-
-        case ThreadMessageAction.READY: {
-          onReady(thread)
-          break
-        }
-
-        case ThreadMessageAction.STARTUP_ERROR: {
-          if (threadRequests.length > 0) {
-            const errorMsg = msg as ThreadErrorMessage
-            const request = threadRequests.shift()
-            const err = new Error(errorMsg.message)
-            err.stack = errorMsg.stack
-            request!.reject(err)
-          }
-          break
-        }
-
-        default: {
-          throw new Error(`Unknown worker pool action "${msg.action}"`)
-        }
-      }
+      throw new Error(`Unknown worker pool action "${(msg as BaseThreadMessage).action}"`)
     })
 
     threadCallbacks.set(id, new Map())
