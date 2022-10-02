@@ -392,6 +392,23 @@ describe('Callbacks', () => {
     expect(callback).toHaveBeenCalledTimes(1)
     expect(callback).toHaveBeenCalledWith(3)
   })
+
+  it('calls the correct function on main if multiple are given', async () => {
+    const worker = await createThreadPool<WorkerWithCallback>('./__tests__/workers/callback')
+
+    const callback1 = jest.fn()
+    const callback2 = jest.fn()
+    worker.withDelayedCallback(1, 2, 100, callback1)
+    worker.withDelayedCallback(2, 2, 10, callback2)
+    
+    await new Promise<void>((resolve) => setTimeout(() => resolve(), 1000))
+    worker.pool.terminate()
+    
+    expect(callback1).toHaveBeenCalledTimes(1)
+    expect(callback1).toHaveBeenCalledWith(3)
+    expect(callback2).toHaveBeenCalledTimes(1)
+    expect(callback2).toHaveBeenCalledWith(4)
+  })
 })
 
 describe('Single Method Modules', () => {

@@ -9,6 +9,7 @@ import { MessagePort, Worker, MessageChannel, isMainThread } from 'worker_thread
 import hasTSNode from './utils/has-ts-node'
 import { CallbackId, ThreadId, ThreadMethodKey } from './types/general'
 import { CallMessage, InitMessage, MainMessageAction, ThreadCallbackMessage, ThreadErrorMessage, ThreadFunctionMessage, ThreadMessageAction } from './types/messages'
+import { createSequence } from './utils/sequence'
 
 const { threadId: dynamicThreadId, debug: dynamicDebug } = require('./export-bridge')
 export const threadId = dynamicThreadId
@@ -20,9 +21,7 @@ if (!isMainThread) {
   debug = dynamicDebug
 }
 
-const workerProxyPath = path.resolve(__dirname, 'ts-bridge.js')
 let __puddle__threadIdOffset: number = 1
-
 
 export type Thread = {
   id: ThreadId
@@ -129,8 +128,11 @@ export async function createThreadPool<WorkerType> (workerPath: string, {
   const availableThreads: Thread[] = []
   const threadRequests: ThreadRequest[] = []
   const threadCallbacks: Map<ThreadId, Map<CallbackId, Callback>> = new Map<ThreadId,  Map<CallbackId, Callback>>()
+  
   const mainFunctions = new Map<ThreadMethodKey, { [id: number]: Function }>()
-
+  const functionSequence = createSequence()
+  const functionToId = new Map<Function, number>()
+  
   let callbackCount = 0
   let isTerminated = false
 
@@ -364,9 +366,14 @@ export async function createThreadPool<WorkerType> (workerPath: string, {
           mainFunctions.set(key, {})
         }
         const fnHolder = mainFunctions.get(key)!
-        console.log('IS SAME?', fnHolder[functionsInArgs] === arg)
-        fnHolder[functionsInArgs] = arg
-        return { id: functionsInArgs } 
+        
+        if (functionToId.has(arg)) {
+          return { id: functionToId.get(arg) }
+        }
+
+        const newId = functionSequence.next()
+        fnHolder[newId] = arg
+        return { id: newId } 
       }
       return arg
     })
