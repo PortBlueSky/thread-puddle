@@ -50,8 +50,6 @@ start()
 
 This and more examples can be found in the `examples` directory.
 
-_Note_: You can use worker threads since __Node.js 12+__ without flag. For __Node.js 10.5+__ you need the `--experimental-worker` flag.
-
 
 ## Typing
 
