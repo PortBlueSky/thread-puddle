@@ -42,7 +42,7 @@
     }
   },
   "engines": {
-    "node": ">=14.15.1"
+    "node": ">=14.17.0"
   },
   "engineStrict": true,
   "keywords": [
