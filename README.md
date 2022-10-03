@@ -28,7 +28,7 @@ export interface IMyWorker {
   say(): string;
 }
 
-export default = {
+export default {
   say: () => console.log('Hello!')
 }
 ```
