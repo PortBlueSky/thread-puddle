@@ -436,6 +436,8 @@ describe('Callbacks', () => {
     expect(callback).toHaveBeenCalledTimes(1)
     expect(callback).toHaveBeenCalledWith(30)
   })
+
+  it.todo('transfers result of the callback back to the thread')
 })
 
 describe('Single Method Modules', () => {

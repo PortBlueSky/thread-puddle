@@ -1,5 +1,14 @@
 # Changelog
 
+## Version 0.4.0
+  - Basic Callback Functions #21
+    - Workers can now implement EventEmitter behaviour
+    - Worker paths can now be relative
+    - ts-node is now `transpile-only` per default
+    - Allows chaining (resolves to the proxy when the worker returns itself)
+    - Upgrade all dev dependencies
+    - Improved typing
+
 ## Version 0.3.2
   - Stricter and fixed types #16
 

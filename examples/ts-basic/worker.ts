@@ -1,6 +1,6 @@
 // worker.ts
 export interface IMyWorker {
-  say(): string;
+  say(): void
 }
 
 export default {
