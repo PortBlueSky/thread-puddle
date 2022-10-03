@@ -1,1 +1,5 @@
 coverage
+.travis.yml
+.eslintignore
+.eslintrc
+*.log
