@@ -150,25 +150,24 @@ describe('Basic Features', () => {
   })
   
   it('warns if thread call queue becomes too large', (done) => {
-    const promises = []
+    const promises: any[] = []
     
-    worker.pool.on('warn:all:queue:length', (length: number) => {
+    worker.pool.once('warn:all:queue:length', (length: number) => {
       expect(length).toBeGreaterThan(1000)
       done()
     })
-    
+
     for (let i = 0; i < 1100; i++) {
       promises.push(worker.all.asyncFn('x', 5000))
-      //                  ^^^^
     }
     
     Promise.all(promises).catch((err) => {})
   })
 
   it('warns if thread request queue becomes too large', (done) => {
-    const promises = []
+    const promises: any[] = []
     
-    worker.pool.on('warn:queue:length', (length: number) => {
+    worker.pool.once('warn:queue:length', (length: number) => {
       expect(length).toBeGreaterThan(1000)
       done()
     })
@@ -179,6 +178,8 @@ describe('Basic Features', () => {
     
     Promise.all(promises).catch((err) => {})
   })
+
+  it.todo('rejects worker method calls if maxQueueLength is reached')
 
   it.todo('allows to call methods on the parent thread')
   it.todo('can call a method on a specific worker directly')

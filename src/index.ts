@@ -95,6 +95,7 @@ export async function createThreadPool<WorkerType> (workerPath: string, {
   workerOptions = {},
   startupTimeout = 30000,
   typecheck = false,
+  // TODO: Rename to maxQueueLength and reject method calls if reached
   queueWarnLength = 1000
 }: ThreadPoolOptions = {}): Promise<FilterAndWrap<WorkerType> & BaseWorker & { all: FilterAndWrap<WorkerType> }> {
   debugOut('carving out a puddle...')
