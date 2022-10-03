@@ -8,7 +8,7 @@
 
 [![Build Status](https://travis-ci.com/PortBlueSky/thread-puddle.svg?branch=master)](https://travis-ci.com/PortBlueSky/thread-puddle) [![npm version](https://badge.fury.io/js/thread-puddle.svg)](https://badge.fury.io/js/thread-puddle) [![Coverage Status](https://coveralls.io/repos/github/PortBlueSky/thread-puddle/badge.svg?branch=master)](https://coveralls.io/github/PortBlueSky/thread-puddle?branch=master)
 
-A small library to pool Node.js [worker threads](https://nodejs.org/dist/latest-v13.x/docs/api/worker_threads.html), automatically exposing exported module methods using [Proxy Objects](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Proxy) for easy bi-directional communication between main and worker thread.
+A library to pool Node.js [worker threads](https://nodejs.org/dist/latest-v13.x/docs/api/worker_threads.html), automatically exposing exported module methods using [Proxy Objects](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Proxy) for easy bi-directional communication between main and worker thread.
 
 __+ Full TypeScript Support__ (optionally using [ts-node](https://github.com/TypeStrong/ts-node) in development)
 
@@ -16,40 +16,42 @@ __+ Full TypeScript Support__ (optionally using [ts-node](https://github.com/Typ
 
 ```bash
 npm install thread-puddle
+# or
+yarn add thread-puddle
 ```
-
-_Note_: You can use worker threads since __Node.js 12+__ without flag. For __Node.js 10.5+__ you need the `--experimental-worker` flag.
 
 ### Usage Example
 
 ```ts
-// worker.ts
-export interface IMyWorker {
-  say(): string;
+// examples/ts-class/worker.ts
+export class MyWorker {
+  say(): void {
+    console.log('Hello!')
+  }
 }
 
-module.exports = {
-  say: () => 'Hello!'
-} as IMyWorker
+export default new MyWorker()
 ```
 
 ```ts
-// main.ts
+// examples/ts-class/main.ts
 import { createThreadPool } from '../../lib'
-import { IMyWorker } from './worker'
+import { MyWorker } from './worker'
 
-const worker = await createThreadPool<IMyWorker>('./worker', {
-  size: 2
-})
+async function start () {
+  const worker = await createThreadPool<MyWorker>('./worker')
+  await worker.say() // -> "Hello!"
+  
+  worker.pool.terminate()
+}
 
-const result = await worker.say()
-
-console.log(result) // -> "Hello!"
-
-worker.pool.terminate()
+start()
 ```
 
-This and more examples in plain JS can be found in the `examples` directory.
+This and more examples can be found in the `examples` directory.
+
+_Note_: You can use worker threads since __Node.js 12+__ without flag. For __Node.js 10.5+__ you need the `--experimental-worker` flag.
+
 
 ## Typing
 
@@ -72,10 +74,6 @@ interface Calculations {
   crunchNumbers(data: number[]): Promise<number>;
   pool: PoolInterface
 }
-
-// Expressed as:
-const worker: WrapReturnType<Pick<ValidWorker, "crunchNumbers">> & BaseWorkerType
-
 ```
 
 
@@ -87,11 +85,12 @@ Creates a pool of workers and waits until all workers are ready to call methods 
 
 Arguments:
 
-- `workerPath` - an absolute path to a module.
+- `workerPath` - an absolute or relative path to a module.
 - `options` - optional settings:
   - `size`- the number of worker threads to be created in the pool for the given module. Defaults to `1`.
   - `workerOptions` - will be used as options for the [worker thread constructor](https://nodejs.org/dist/latest-v12.x/docs/api/worker_threads.html#worker_threads_new_worker_filename_options). Defaults to `{}`.
   - `startupTimeout` - if a worker thread cannot be started within this timout in milliseconds, the pool creation will fail and reject with a timout error. Defaults to `30000`.
+  - `typecheck` - In development `ts-node` is used, which by default runs `transpile-only` mode. To get type checks, set this to `true`.
 
 If the pool size is `> 1`, method calls will be forwarded to the next available worker. If all workers are busy, the method calls will be queued. A worker will handle one method call at any time only.
 
@@ -103,6 +102,36 @@ On the Proxy Object returned from `createThreadPool`, you can call any method wh
 - `arguments` - Arbitrary number of arguments forwarded to the method call in the worker thread.
 
 `Arguments` are transferred to the worker thread via [`postMessage`](https://nodejs.org/dist/latest-v12.x/docs/api/worker_threads.html#worker_threads_port_postmessage_value_transferlist), compatible with the [HTML structured clone algorithm](https://developer.mozilla.org/en-US/docs/Web/API/Web_Workers_API/Structured_clone_algorithm). If you want to move arguments of type `ArrayBuffer` or `MessageChannel` instead of copying them, you can use the `withTransfer` helper.
+
+`Arguments` can contain a __`function`__ in the first level, which will be callable from the thread via a reference, but be executed on the main thread.
+__However__, the result of the callback is currently __not__ transfered back to the thread. It possible to implement a worker thread with an `EventEmitter` though, see the [eventemitter example](./examples/ts-eventemitter/).
+
+```ts
+// examples/ts-callbacks/worker.ts
+export class MyWorker {
+  callMe(callback: (msg: string) => void): void {
+    callback('Hello!')
+  }
+}
+
+export default new MyWorker()
+```
+
+```ts
+// examples/ts-callbacks/main.ts
+import { createThreadPool } from '../../lib'
+import { MyWorker } from './worker'
+
+async function start () {
+  const worker = await createThreadPool<MyWorker>('./worker')
+  const callback = (msg: string) => console.log(msg)
+  await worker.callMe(callback) 
+  
+  worker.pool.terminate()
+}
+
+start()
+```
 
 ### `async worker.all.[method]([arguments])`
 
@@ -187,7 +216,7 @@ Nested Namespaces:
 The debug method with the correct namespace is exported from the `thread-puddle` entry point.
 
 ---
-&copy; 2021 Sebastian Herrlinger
+&copy; 2022 Sebastian Herrlinger
 
 Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
 

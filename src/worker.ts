@@ -1,7 +1,17 @@
 import { parentPort } from 'worker_threads'
 import createDebug from 'debug'
 import { TransferableValue } from './Transferable'
-import { MainMessage } from '.'
+import { 
+  BaseMainMessage,
+  CallMessage,
+  InitMessage,
+  ThreadCallbackMessage,
+  ThreadErrorMessage,
+  ThreadFreeFunctionMessage,
+  ThreadFunctionMessage,
+  ThreadMessageAction 
+} from './types/messages'
+import { FunctionId, ThreadMethodKey } from './types/general'
 
 const dynamicExports = require('./export-bridge')
 
@@ -9,91 +19,128 @@ if (!parentPort) {
   throw new Error('No parentPort available')
 }
 
-parentPort.once('message', async (msg) => {
-  if (msg.action === 'init') {
-    const { workerPath, port, id, parentId } = msg
+parentPort.once('message', async (msg: InitMessage) => {
+  if (msg.action !== 'init') {
+    return
+  }
 
-    let debug = createDebug(`puddle:thread:${id}`)
-    if (parentId) {
-      debug = createDebug(`puddle:parent:${parentId}:thread:${id}`)
-    } 
+  const { workerPath, port, id, parentId } = msg
 
-    debug('Initializing worker thread...')
-    let worker: Record<string, Function | any> | null = null
+  let debug = createDebug(`puddle:thread:${id}`)
+  if (parentId) {
+    debug = createDebug(`puddle:parent:${parentId}:thread:${id}`)
+  }
 
-    dynamicExports.threadId = id
-    dynamicExports.debug = debug
+  debug('Initializing worker thread...')
+  let worker: Record<string, Function | any> | null = null
 
-    try {
-      let isCommonJS = false
+  dynamicExports.threadId = id
+  dynamicExports.debug = debug
 
-      
-      worker = await import(workerPath)
+  try {
+    let isCommonJS = false
 
-      if (!worker) {
-        throw new Error('Worker does not expose a mountable object')
-      }
+    worker = await import(workerPath)
 
-      const workerKeys = Object.keys(worker)
-      isCommonJS = workerKeys.length === 1 && workerKeys[0] === 'default'
-
-      if (isCommonJS) {
-        worker = worker.default
-        if (!(worker instanceof Object)) {
-          throw new Error(`Worker should export an object, got ${worker}`)
-        }
-      }
-
-      let callables = 0
-      for (const key of Object.keys(worker!)) {
-        if (typeof worker![key] === 'function') {
-          callables++
-        }
-      }
-      if (callables === 0) {
-        throw new Error('Worker should export at least one method')
-      }
-    } catch ({ message, stack }) {
-      port.postMessage({ action: 'startup-error', message, stack })
-      return
+    if (!worker) {
+      throw new Error('Worker does not expose a mountable object')
     }
 
-    port.on('message', async ({ action, key, args, callbackId }: MainMessage) => {
-      switch (action) {
-        case 'call': {
-          debug('calling worker thread method %s', key)
+    const workerKeys = Object.keys(worker)
+    isCommonJS = workerKeys.includes('default')
 
-          try {
-            // TODO: ensure hasOwnProperty
-            if (typeof worker![key] !== 'function') {
-              debug('%s is not a function', key)
-              throw new Error(`"${key}" is not a function in this worker thread`)
-            }
-            const result = await worker![key](...args)
-
-            debug('worker done with thread method %s', key)
-
-            if (result instanceof TransferableValue) {
-              port.postMessage({
-                action: 'resolve',
-                callbackId,
-                result: result.obj
-              }, result.transferables)
-            } else {
-              port.postMessage({ action: 'resolve', callbackId, result })
-            }
-          } catch ({ message, stack }) {
-            debug(message)
-            port.postMessage({ action: 'reject', callbackId, message, stack })
-          }
-          break
-        }
-        default: {
-          throw new Error(`Unknown action "${msg.action}" for worker thread`)
-        }
+    if (isCommonJS) {
+      worker = worker.default
+      if (!(worker instanceof Object)) {
+        throw new Error(`Worker should export an object, got ${worker}`)
       }
-    })
-
-    msg.port.postMessage({ action: 'ready' })
+    }
+  } catch ({ message, stack }) {
+    port.postMessage({ action: ThreadMessageAction.STARTUP_ERROR, message, stack })
+    return
   }
+
+  const functionRegistry = new FinalizationRegistry(({id, key }: { id: FunctionId, key: ThreadMethodKey }) => {
+    const fnMsg: ThreadFreeFunctionMessage = {
+      action: ThreadMessageAction.FREE_FUNCTION,
+      functionId: id,
+      key
+    }
+    port.postMessage(fnMsg)
+  })
+
+  port.on('message', async (msg: BaseMainMessage) => {
+    switch (msg.action) {
+      case 'call': {
+        const { key, args, callbackId, argFunctionPositions } = msg as CallMessage
+        debug('calling worker thread method %s', key)
+
+        try {
+          // TODO: ensure hasOwnProperty
+          if (typeof worker![key] !== 'function') {
+            debug('%s is not a function', key)
+            throw new Error(`"${key}" is not a function in this worker thread`)
+          }
+
+          if (argFunctionPositions.length > 0) {
+            for (const fnArgPos of argFunctionPositions) {
+              const { id } = args[fnArgPos]
+              const fn = (...cbArgs: any[]) => {
+                // TODO: Make transferables work here
+                const fnMsg: ThreadFunctionMessage = {
+                  action: ThreadMessageAction.CALL_FUNCTION,
+                  functionId: id,
+                  key,
+                  args: cbArgs
+                }
+                port.postMessage(fnMsg)
+              }
+              functionRegistry.register(fn, id, fn)
+              args[fnArgPos] = fn
+            }
+          }
+
+          let result = await worker![key](...args)
+
+          debug('worker done with thread method %s', key)
+
+          if (result === worker) {
+            result = '__THIS__'
+          } 
+          
+          if (result instanceof TransferableValue) {
+            const resultMsg: ThreadCallbackMessage = {
+              action: ThreadMessageAction.RESOLVE,
+              callbackId,
+              result: result.obj
+            }
+            port.postMessage(resultMsg, result.transferables)
+          } else {
+            const resultMsg: ThreadCallbackMessage = { 
+              action: ThreadMessageAction.RESOLVE, 
+              callbackId, 
+              result 
+            }
+            port.postMessage(resultMsg)
+          }
+        } catch ({ message, stack }) {
+          debug(message)
+          const resultMsg: ThreadErrorMessage = { 
+            action: ThreadMessageAction.REJECT, 
+            callbackId, 
+            message: message as string, 
+            stack: stack as string 
+          }
+          port.postMessage(resultMsg)
+        }
+        break
+      }
+
+      default: {
+        throw new Error(`Unknown action "${msg.action}" for worker thread`)
+      }
+    }
+  })
+
+  msg.port.postMessage({ action: 'ready' })
 })

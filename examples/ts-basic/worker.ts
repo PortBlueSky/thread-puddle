@@ -1,8 +1,8 @@
 // worker.ts
 export interface IMyWorker {
-  say(): string;
+  say(): void
 }
 
-module.exports = {
-  say: () => 'Hello!'
-} as IMyWorker
+export default {
+  say: () => console.log('Hello!')
+}

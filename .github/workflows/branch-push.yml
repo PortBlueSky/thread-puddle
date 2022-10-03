@@ -1,0 +1,11 @@
+name: Branch Push
+
+on:
+  push:
+    branches-ignore:
+      - master
+      - main
+
+jobs:
+  tests:
+    uses: ./.github/workflows/tests.yml

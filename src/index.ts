@@ -1,9 +1,15 @@
 import path from 'path'
 import { EventEmitter } from 'events'
 import createDebug from 'debug'
-import { TransferableValue, withTransfer } from './Transferable'
+import getCallsites from './utils/callsites'
+
+import { TransferableValue } from './Transferable'
 export { withTransfer } from './Transferable'
 import { MessagePort, Worker, MessageChannel, isMainThread } from 'worker_threads'
+import hasTSNode from './utils/has-ts-node'
+import { CallbackId, ThreadId, ThreadMethodKey } from './types/general'
+import { BaseThreadMessage, CallMessage, InitMessage, isThreadCallbackMessage, isThreadErrorMessage, isThreadFreeFunctionMessage, isThreadFunctionMessage, isThreadReadyMessage, isThreadStartupErrorMessage, MainMessageAction, ThreadCallbackMessage, ThreadErrorMessage, ThreadFreeFunctionMessage, ThreadFunctionMessage, ThreadMessageAction, ThreadReadyMessage } from './types/messages'
+import { createSequence } from './utils/sequence'
 
 const { threadId: dynamicThreadId, debug: dynamicDebug } = require('./export-bridge')
 export const threadId = dynamicThreadId
@@ -15,82 +21,50 @@ if (!isMainThread) {
   debug = dynamicDebug
 }
 
-const workerProxyPath = path.resolve(__dirname, 'ts-bridge.js')
 let __puddle__threadIdOffset: number = 1
 
-export type ThreadId = number
-export type CallbackId = number
-
-export interface Thread {
-  id: number;
-  connected: boolean;
-  worker: Worker;
-  port: MessagePort;
-  error: Error | boolean;
-  callQueue: QueuedCall[];
-  busy: boolean;
+export type Thread = {
+  id: ThreadId
+  connected: boolean
+  worker: Worker
+  port: MessagePort
+  error: Error | boolean
+  callQueue: QueuedCall[]
+  busy: boolean
 }
 
 export interface QueuedCall {
-  key: string | number | symbol;
-  args: Array<any>;
+  key: ThreadMethodKey
+  args: Array<any>
   resolve: (result: any) => void,
   reject: (error: Error) => void
 }
 
 export interface ThreadRequest {
-  resolve(thread: Thread): void;
-  reject(error: Error): void;
+  resolve(thread: Thread): void
+  reject(error: Error): void
 }
 
 export interface Callback {
-  resolve(thread: Thread): void;
-  reject(error: Error): void;
+  resolve(thread: Thread): void
+  reject(error: Error): void
 }
 
-export enum MessageAction {
-  RESOLVE = 'resolve',
-  REJECT = 'reject',
-  READY = 'ready',
-  STARTUP_ERROR = 'startup-error'
+export type ThreadPoolOptions = {
+  size?: number
+  typecheck?: boolean
+  workerOptions?: any // TODO: Use worker options type from node types
+  startupTimeout?: number
 }
 
-export enum MainMessageAction {
-  CALL = 'call',
-}
-
-export interface ThreadMessage {
-  action: MessageAction;
-  callbackId: CallbackId;
-  result: any;
-}
-
-export interface MainMessage {
-  action: MainMessageAction,
-  key: string,
-  callbackId: number,
-  args: any
-}
-
-export interface ThreadErrorMessage extends ThreadMessage {
-  message: string;
-  stack: string;
-}
-
-export interface ThreadPoolOptions {
-  size?: number;
-  workerOptions?: any; // TODO: Use worker options type from node types
-  startupTimeout?: number;
-}
-
-export interface BaseWorkerType {
-  pool: PoolInterface;
+export interface BaseWorker {
+  pool: PoolInterface
 }
 
 export interface PoolInterface extends EventEmitter {
-  terminate(): void;
-  size: number;
-  isTerminated: boolean;
+  terminate(): void
+  size: number
+  isTerminated: boolean
 }
 
 type ProxyWorkerTarget = Record<string, any>
@@ -99,38 +73,66 @@ type FilterType<Base, Condition> = Pick<Base, {
   [Key in keyof Base]: Base[Key] extends Condition ? Key : never
 }[keyof Base]>;
 
-type WrapReturnType<Base extends { [a: string]: (...a: any) => any }> = {
-  [Key in keyof Base]: Base[Key] extends (...a: any) => Promise<any> 
+type TypeWithMethods = Record<string | number | symbol,  (...a: any) => any | Promise<any>>
+export type AsyncMethod = (...param: any) => Promise<any>
+
+type WrapReturnType<Base extends TypeWithMethods> = {
+  [Key in keyof Base]: Base[Key] extends AsyncMethod
     ? Base[Key] 
     : (...a: Parameters<Base[Key]>) => Promise<ReturnType<Base[Key]>>;
 };
 
-type FilterAndWrap<Base> = WrapReturnType<FilterType<Base, Function>>
+// @ts-ignore
+// TODO: Fix usage of interface vs. type
+// Even though this complains, the type is inferred from the template correctly,
+// working for classes/interfaces and types
+type FilterAndWrap<Base> = WrapReturnType<FilterType<Required<Base>, Function>>
 
 
-export async function createThreadPool<WorkerType extends object> (workerPath: string, {
+export async function createThreadPool<WorkerType> (workerPath: string, {
   size = 1,
   workerOptions = {},
-  startupTimeout = 30000
-}: ThreadPoolOptions = {}): Promise<FilterAndWrap<WorkerType> & BaseWorkerType & { all: FilterAndWrap<WorkerType> }> {
+  startupTimeout = 30000,
+  typecheck = false
+}: ThreadPoolOptions = {}): Promise<FilterAndWrap<WorkerType> & BaseWorker & { all: FilterAndWrap<WorkerType> }> {
   debugOut('carving out a puddle...')
 
-  type TargetWorkerType = BaseWorkerType & { all: FilterAndWrap<WorkerType> }
+  type TargetWorkerType = BaseWorker & { all: FilterAndWrap<WorkerType> }
   type ExtendedWorkerType = TargetWorkerType & FilterAndWrap<WorkerType>
 
   // Based on: https://github.com/Microsoft/TypeScript/issues/20846#issuecomment-582183737
   interface PoolProxyConstructor {
-    new <T, H extends object, K extends BaseWorkerType>(target: T, handler: ProxyHandler<H>): K
+    new <T, H extends object, K extends BaseWorker>(target: T, handler: ProxyHandler<H>): K
   }
 
   interface PoolProxyAllConstructor {
     new <T, H extends object, K extends WorkerType>(target: T, handler: ProxyHandler<H>): K
   }
-  
+
+  // Resolve relative worker path
+  let resolvedWorkerPath = workerPath
+
+  if (!path.isAbsolute(workerPath)) {
+    let callsites = getCallsites()
+    if (callsites) {
+      callsites = callsites.filter((cs) => cs.getFileName())
+      const callerPath = callsites[1].getFileName()
+      const { dir: basePath} = path.parse(callerPath!)
+      resolvedWorkerPath = path.resolve(basePath, workerPath)
+    }
+  }
+
+  const { ext: resolvedWorkerExtension } = path.parse(require.resolve(resolvedWorkerPath))
+
   const threads: Thread[] = []
   const availableThreads: Thread[] = []
   const threadRequests: ThreadRequest[] = []
   const threadCallbacks: Map<ThreadId, Map<CallbackId, Callback>> = new Map<ThreadId,  Map<CallbackId, Callback>>()
+  
+  const mainFunctions = new Map<ThreadMethodKey, { [id: number]: Function }>()
+  const functionSequence = createSequence()
+  const functionToId = new Map<Function, number>()
+  
   let callbackCount = 0
   let isTerminated = false
 
@@ -162,7 +164,19 @@ export async function createThreadPool<WorkerType extends object> (workerPath: s
   const createThread = (id: ThreadId) => {
     debugOut('creating worker thread %s', id)
 
-    const worker = new Worker(workerProxyPath, workerOptions)
+    const bridgeWorkerPath = path.resolve(__dirname, 'worker')
+    const { ext: bridgeWorkerExtension } = path.parse(require.resolve(bridgeWorkerPath))
+    let workerString = `require('${bridgeWorkerPath}')`
+
+    if (hasTSNode() && [bridgeWorkerExtension, resolvedWorkerExtension].includes('.ts')) {
+      if (typecheck) {
+        workerString = `require('ts-node').register()\n${workerString}`
+      } else {
+        workerString = `require('ts-node/register/transpile-only')\n${workerString}`
+      }
+    }
+
+    const worker = new Worker(workerString, { ...workerOptions, eval: true })
     const { port1, port2 } = new MessageChannel()
     const thread: Thread = {
       id,
@@ -180,7 +194,7 @@ export async function createThreadPool<WorkerType extends object> (workerPath: s
       thread.connected = true
     })
 
-    worker.on('exit', (code) => {
+    worker.on('exit', (code: number) => {
       debugOut('worker %d exited with code %d', id, code)
 
       if (puddleInterface.listenerCount('exit') > 0) {
@@ -239,53 +253,70 @@ export async function createThreadPool<WorkerType extends object> (workerPath: s
       }
     })
 
-    worker.postMessage({
-      action: 'init',
-      workerPath,
+    const initMsg: InitMessage = {
+      action: MainMessageAction.INIT,
+      workerPath: resolvedWorkerPath,
       port: port1,
       id,
       parentId: threadId
-    }, [port1])
-    port2.on('message', (msg: ThreadMessage | ThreadErrorMessage) => {
-      switch (msg.action) {
-        case MessageAction.RESOLVE: {
-          debugOut('worker %d resolved callback %d', id, msg.callbackId)
-          const callbacks = threadCallbacks.get(id)
-          const callback = callbacks!.get(msg.callbackId)
-          callbacks!.delete(msg.callbackId)
-          onReady(thread)
-          callback!.resolve(msg.result)
-          break
+    }
+
+    worker.postMessage(initMsg, [port1])
+
+    port2.on('message', (
+      msg: BaseThreadMessage
+    ) => {
+      if (isThreadCallbackMessage(msg)) {
+        debugOut('worker %d resolved callback %d', id, msg.callbackId)
+        
+        const callbacks = threadCallbacks.get(id)
+        const callback = callbacks!.get(msg.callbackId)
+        callbacks!.delete(msg.callbackId)
+        onReady(thread)
+        callback!.resolve(msg.result)
+        return
+      } else if (isThreadErrorMessage(msg)) {
+        debugOut('worker %d rejected callback %d', id, msg.callbackId)
+        
+        const callbacks = threadCallbacks.get(id)
+        const callback = callbacks!.get(msg.callbackId)
+        callbacks!.delete(msg.callbackId)
+        const err = new Error(msg.message)
+        err.stack = msg.stack
+        onReady(thread)
+        callback!.reject(err)
+        return
+      } else if (isThreadFunctionMessage(msg)) {
+        debugOut('worker %d calling function %s[%d]', id, msg.key, msg.functionId)
+        
+        const fnHolder = mainFunctions.get(msg.key)
+        if (fnHolder) {
+          fnHolder[msg.functionId](...msg.args)
         }
-        case MessageAction.REJECT: {
+        return
+      } else if (isThreadFreeFunctionMessage(msg)) {
+        debugOut('worker %d calling free %s[%d]', id, msg.key, msg.functionId)
+          
+        const fnHolder = mainFunctions.get(msg.key)
+        if (fnHolder) {
+          delete fnHolder[msg.functionId]
+        }
+        return
+      } else if (isThreadReadyMessage(msg)) {
+        onReady(thread)
+        return
+      } else if (isThreadStartupErrorMessage(msg)) {
+        if (threadRequests.length > 0) {
           const errorMsg = msg as ThreadErrorMessage
-          const callbacks = threadCallbacks.get(id)
-          const callback = callbacks!.get(errorMsg.callbackId)
-          callbacks!.delete(errorMsg.callbackId)
+          const request = threadRequests.shift()
           const err = new Error(errorMsg.message)
           err.stack = errorMsg.stack
-          onReady(thread)
-          callback!.reject(err)
-          break
+          request!.reject(err)
         }
-        case MessageAction.READY: {
-          onReady(thread)
-          break
-        }
-        case MessageAction.STARTUP_ERROR: {
-          if (threadRequests.length > 0) {
-            const errorMsg = msg as ThreadErrorMessage
-            const request = threadRequests.shift()
-            const err = new Error(errorMsg.message)
-            err.stack = errorMsg.stack
-            request!.reject(err)
-          }
-          break
-        }
-        default: {
-          throw new Error(`Unknown worker pool action "${msg.action}"`)
-        }
-      }
+        return
+      } 
+
+      throw new Error(`Unknown worker pool action "${(msg as BaseThreadMessage).action}"`)
     })
 
     threadCallbacks.set(id, new Map())
@@ -306,7 +337,7 @@ export async function createThreadPool<WorkerType extends object> (workerPath: s
 
   function callOnThread (
     thread: Thread, 
-    key: string | number | symbol, 
+    key: ThreadMethodKey, 
     args: Array<any>, 
     resolve: (thread: Thread) => void, 
     reject: (error: Error) => void
@@ -316,21 +347,42 @@ export async function createThreadPool<WorkerType extends object> (workerPath: s
     const callbackId = callbackCount++
     threadCallbacks.get(thread.id)!.set(callbackId, { resolve, reject })
 
+    let functionsInArgs = 0
+    let argFunctionPositions: number[] = []
     const transferables: Array<MessagePort | ArrayBuffer> = []
-    const iteratedArgs = args.map((arg: any) => {
+    const iteratedArgs = args.map((arg: any, index: number) => {
       if (arg instanceof TransferableValue) {
         transferables.push(...arg.transferables)
         return arg.obj
       }
+      if (typeof arg === 'function') {
+        functionsInArgs += 1
+        argFunctionPositions.push(index)
+        if (!mainFunctions.has(key)) {
+          mainFunctions.set(key, {})
+        }
+        const fnHolder = mainFunctions.get(key)!
+        
+        if (functionToId.has(arg)) {
+          return { id: functionToId.get(arg) }
+        }
+
+        const newId = functionSequence.next()
+        fnHolder[newId] = arg
+        return { id: newId } 
+      }
       return arg
     })
 
-    thread.port.postMessage({
-      action: 'call',
+    const msg: CallMessage = {
+      action: MainMessageAction.CALL,
       key,
       callbackId,
-      args: iteratedArgs
-    }, transferables)
+      args: iteratedArgs,
+      argFunctionPositions
+    }
+
+    thread.port.postMessage(msg, transferables)
   }
 
   const getAvailableThread = () => new Promise<Thread>((resolve, reject) => {
@@ -395,12 +447,10 @@ export async function createThreadPool<WorkerType extends object> (workerPath: s
   })
   Object.defineProperties(puddleInterface, {
     size: {
-      get: () => threads.length,
-      writeable: false
+      get: () => threads.length
     },
     isTerminated: {
-      get: () => isTerminated,
-      writeable: false
+      get: () => isTerminated
     }
   })
 
@@ -437,8 +487,11 @@ export async function createThreadPool<WorkerType extends object> (workerPath: s
     all: allWorkersInterface as FilterAndWrap<WorkerType>
   }
 
+  // Intermediate, so the proxy can return itself
+  let proxy: ExtendedWorkerType
+  
   const handler = {
-    get: (target: ProxyWorkerTarget, key: string) => {
+    get: (proxyTarget: ProxyWorkerTarget, key: string) => {
       // NOTE: If the proxy is returned from an async function,
       // the engine checks if it is a thenable by checking existence of a then method
       if (key === 'then') {
@@ -446,16 +499,25 @@ export async function createThreadPool<WorkerType extends object> (workerPath: s
       }
 
       if (key === 'pool' || key === 'all') {
-        return target[key]
+        return proxyTarget[key]
       }
 
-      return (...args: any[]) => new Promise((resolve, reject) => {
-        getAvailableThread()
-          .then((thread: Thread) => callOnThread(thread, key, args, resolve, reject))
-          .catch(err => reject(err))
-      })
+      return async (...args: any[]) => {
+        const result = await new Promise((resolve, reject) => {
+          getAvailableThread()
+            .then((thread: Thread) => callOnThread(thread, key, args, resolve, reject))
+            .catch(err => reject(err))
+        })
+        
+        if (result === '__THIS__') {
+          return proxy
+        }
+
+        return result
+      }
     }
   }
 
-  return new PoolProxy<typeof target, typeof handler, ExtendedWorkerType> (target, handler)
+  proxy = new PoolProxy<typeof target, typeof handler, ExtendedWorkerType> (target, handler)
+  return proxy
 }
