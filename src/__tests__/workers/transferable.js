@@ -10,9 +10,9 @@ module.exports = {
   getArray: () => uint8Array,
   get16Array: () => uint16Array,
   get32Array: () => uint32Array,
-  getTransferredArray: () => withTransfer(uint8Array, [uint8Array]),
-  getTransferred16Array: () => withTransfer(uint16Array, [uint16Array]),
-  getTransferred32Array: () => withTransfer(uint32Array, [uint32Array]),
+  getTransferredArray: () => withTransfer(uint8Array),
+  getTransferred16Array: () => withTransfer(uint16Array),
+  getTransferred32Array: () => withTransfer(uint32Array),
   setArray: (arr) => {
     if (!(arr instanceof Uint8Array)) {
       throw new Error('Expected Uint8Array')
