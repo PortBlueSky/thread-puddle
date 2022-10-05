@@ -15,5 +15,7 @@ jobs:
           node-version: '18.10.0'
       - name: Install dependencies
         run: yarn --immutable
+      - name: Run Test Coverage
+        run: yarn test:coverage
       - name: Run Coveralls
         run: yarn coveralls

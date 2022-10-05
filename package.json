@@ -27,7 +27,7 @@
     "test:coverage": "jest --coverage",
     "test:watch": "jest --watch",
     "build": "tsc",
-    "coveralls": "yarn test:coverage && yarn coveralls < coverage/lcov.info",
+    "coveralls": "coveralls < coverage/lcov.info",
     "prepack": "yarn build"
   },
   "dependencies": {
