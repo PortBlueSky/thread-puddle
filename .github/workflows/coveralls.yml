@@ -17,5 +17,7 @@ jobs:
         run: yarn --immutable
       - name: Run Test Coverage
         run: yarn test:coverage
-      - name: Run Coveralls
-        run: yarn coveralls
+      - name: Coveralls
+        uses: coverallsapp/github-action@master
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
