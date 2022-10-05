@@ -1,0 +1,19 @@
+name: Coveralls
+
+on:
+  workflow_call:
+
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout branch
+        uses: actions/checkout@v3
+      - name: Use Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '18.10.0'
+      - name: Install dependencies
+        run: yarn --immutable
+      - name: Run Coveralls
+        run: yarn coveralls

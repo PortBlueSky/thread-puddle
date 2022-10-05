@@ -1,0 +1,15 @@
+name: Master Push
+
+on:
+  push:
+    branches:
+      - master
+      - main
+    tags-ignore:
+      - '**'
+
+jobs:
+  tests:
+    uses: ./.github/workflows/tests.yml
+  coveralls:
+    uses: ./.github/workflows/coveralls.yml
