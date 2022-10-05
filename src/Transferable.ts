@@ -19,7 +19,7 @@ export class TransferableValue {
 }
 
 export function Transferable (obj: any, transferables?: Transferable[]) {
-  new TransferableValue(obj, transferables)
+  return new TransferableValue(obj, transferables)
 }
 
 export function withTransfer (obj: any, transferables?: Transferable[]) {
