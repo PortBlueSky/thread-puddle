@@ -1,5 +1,5 @@
 <p align="center">
-  <img width="480" height="55" src="https://raw.githubusercontent.com/PortBlueSky/thread-puddle/da8e377832d4349834690df53706414ce8aef2b9/assets/tp-logo.png">
+  <img width="320" height="167" src="https://raw.githubusercontent.com/PortBlueSky/thread-puddle/da8e377832d4349834690df53706414ce8aef2b9/assets/tp-logo.png">
 </p>
 
 # thread-puddle
@@ -10,7 +10,10 @@
 
 A library to pool Node.js [worker threads](https://nodejs.org/dist/latest-v13.x/docs/api/worker_threads.html), automatically exposing exported module methods using [Proxy Objects](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Proxy) for easy bi-directional communication between main and worker thread.
 
-__+ Full TypeScript Support__ (optionally using [ts-node](https://github.com/TypeStrong/ts-node) in development)
+__+ Full TypeScript Support__ (optionally using [ts-node](https://github.com/TypeStrong/ts-node) in development)  
+__+ Only one dependency__ (the `debug` package)  
+__+ Callbacks__ (workers can call back functions on the main thread)
+
 
 ### Installation
 
