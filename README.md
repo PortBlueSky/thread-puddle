@@ -1,5 +1,5 @@
 <p align="center">
-  <img width="320" height="167" src="https://raw.githubusercontent.com/PortBlueSky/thread-puddle/da8e377832d4349834690df53706414ce8aef2b9/assets/tp-logo.png">
+  <img width="320" height="167" src="https://raw.githubusercontent.com/PortBlueSky/thread-puddle/75aec302f67b4542cc1577a2803d0ab38046b93f/assets/tp-logo.png">
 </p>
 
 # thread-puddle
