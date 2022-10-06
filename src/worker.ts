@@ -61,11 +61,14 @@ parentPort.once('message', async (msg: InitMessage) => {
   }
 
   const functionRegistry = new FinalizationRegistry(({id, key }: { id: FunctionId, key: ThreadMethodKey }) => {
+    debug('thread freeing method %s for %s', id, key)
+
     const fnMsg: ThreadFreeFunctionMessage = {
       action: ThreadMessageAction.FREE_FUNCTION,
       functionId: id,
       key
     }
+
     port.postMessage(fnMsg)
   })
 
@@ -95,7 +98,7 @@ parentPort.once('message', async (msg: InitMessage) => {
                 }
                 port.postMessage(fnMsg)
               }
-              functionRegistry.register(fn, id, fn)
+              functionRegistry.register(fn, { id, key } , fn)
               args[fnArgPos] = fn
             }
           }

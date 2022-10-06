@@ -61,10 +61,13 @@ export interface BaseWorker {
   pool: PoolInterface
 }
 
+export type MainFunctionMap = Map<number, Function>
+
 export interface PoolInterface extends EventEmitter {
   terminate(): void
   size: number
   isTerminated: boolean
+  callbacks: ReadonlyMap<ThreadMethodKey, MainFunctionMap>
 }
 
 type ProxyWorkerTarget = Record<string, any>
@@ -129,10 +132,9 @@ export async function createThreadPool<WorkerType> (workerPath: string, {
   const threadRequests: ThreadRequest[] = []
   const threadCallbacks: Map<ThreadId, Map<CallbackId, Callback>> = new Map<ThreadId,  Map<CallbackId, Callback>>()
   
-  const mainFunctions = new Map<ThreadMethodKey, { [id: number]: Function }>()
+  const mainFunctions = new Map<ThreadMethodKey, MainFunctionMap>()
   const functionSequence = createSequence()
-  const functionToId = new Map<Function, number>()
-  
+
   let callbackCount = 0
   let isTerminated = false
 
@@ -266,6 +268,8 @@ export async function createThreadPool<WorkerType> (workerPath: string, {
     port2.on('message', (
       msg: BaseThreadMessage
     ) => {
+      puddleInterface.emit('thread:message', msg)
+
       if (isThreadCallbackMessage(msg)) {
         debugOut('worker %d resolved callback %d', id, msg.callbackId)
         
@@ -291,15 +295,18 @@ export async function createThreadPool<WorkerType> (workerPath: string, {
         
         const fnHolder = mainFunctions.get(msg.key)
         if (fnHolder) {
-          fnHolder[msg.functionId](...msg.args)
+          // Note: the function has to be there,
+          // if it fails, something is wrong with storing them or garbage collecting
+          const mFn = fnHolder.get(msg.functionId)!
+          mFn(...msg.args)
         }
         return
       } else if (isThreadFreeFunctionMessage(msg)) {
         debugOut('worker %d calling free %s[%d]', id, msg.key, msg.functionId)
-          
+        
         const fnHolder = mainFunctions.get(msg.key)
         if (fnHolder) {
-          delete fnHolder[msg.functionId]
+          fnHolder.delete(msg.functionId)
         }
         return
       } else if (isThreadReadyMessage(msg)) {
@@ -347,7 +354,6 @@ export async function createThreadPool<WorkerType> (workerPath: string, {
     const callbackId = callbackCount++
     threadCallbacks.get(thread.id)!.set(callbackId, { resolve, reject })
 
-    let functionsInArgs = 0
     let argFunctionPositions: number[] = []
     const transferables: Array<MessagePort | ArrayBuffer> = []
     const iteratedArgs = args.map((arg: any, index: number) => {
@@ -355,20 +361,17 @@ export async function createThreadPool<WorkerType> (workerPath: string, {
         transferables.push(...arg.transferables)
         return arg.obj
       }
+
       if (typeof arg === 'function') {
-        functionsInArgs += 1
         argFunctionPositions.push(index)
         if (!mainFunctions.has(key)) {
-          mainFunctions.set(key, {})
+          mainFunctions.set(key, new Map<number, Function>)
         }
         const fnHolder = mainFunctions.get(key)!
         
-        if (functionToId.has(arg)) {
-          return { id: functionToId.get(arg) }
-        }
-
         const newId = functionSequence.next()
-        fnHolder[newId] = arg
+        fnHolder.set(newId, arg)
+
         return { id: newId } 
       }
       return arg
@@ -451,6 +454,9 @@ export async function createThreadPool<WorkerType> (workerPath: string, {
     },
     isTerminated: {
       get: () => isTerminated
+    },
+    callbacks: {
+      get: () => mainFunctions
     }
   })
 
