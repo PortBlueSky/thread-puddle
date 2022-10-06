@@ -24,7 +24,7 @@
   },
   "scripts": {
     "test": "jest",
-    "test:gc": "node --max-old-space-size=128 ./node_modules/.bin/jest --config=jest.gc.config.json src/gc.spec.ts",
+    "test:gc": "node --max-old-space-size=192 ./node_modules/.bin/jest --config=jest.gc.config.json src/gc.spec.ts",
     "test:coverage": "jest --coverage",
     "test:watch": "jest --watch",
     "build": "tsc",
