@@ -25,12 +25,12 @@ describe('Garbage Collections', () => {
     for (let i = 0; i < callTimes; i++) {
       if (i % 1000 === 0) {
         // Give garbage collection some time to kick in
-        await new Promise<void>((resolve) => setTimeout(() => resolve(), 100))
+        await new Promise<void>((resolve) => setTimeout(() => resolve(), 250))
       }
       await worker.withCallback(1, 2, callback)
     }
     
-    await new Promise<void>((resolve) => setTimeout(() => resolve(), 3000))
+    await new Promise<void>((resolve) => setTimeout(() => resolve(), 5000))
     worker.pool.terminate()
 
     expect(callback.mock.calls.length).toBeGreaterThan(10000)
@@ -42,5 +42,5 @@ describe('Garbage Collections', () => {
     })
     const numberOfStoredMethods = worker.pool.callbacks.get('withCallback')?.size
     expect(numberOfStoredMethods).toBeLessThan(callTimes / 2)
-  }, 20000)
+  }, 30000)
 })
