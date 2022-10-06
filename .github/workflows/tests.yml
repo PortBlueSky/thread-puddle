@@ -23,5 +23,7 @@ jobs:
         run: yarn --immutable
       - name: Run Tests
         run: yarn test
+      - name: Run Garbage Collection Tests
+        run: yarn test:gc
       - name: Run Build
         run: yarn build
