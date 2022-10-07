@@ -1,0 +1,23 @@
+name: Publish NPM Package
+
+on:
+  workflow_call:
+    secrets:
+      NPM_TOKEN:
+        required: true
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-node@v3
+        with:
+          node-version: '16.17.1'
+          registry-url: 'https://registry.npmjs.org'
+      - name: Install dependencies
+        run: yarn --immutable
+      - name: publish
+        run: npm publish
+        env:
+          NODE_AUTH_TOKEN: ${{secrets.NPM_TOKEN}}

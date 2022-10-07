@@ -1,0 +1,12 @@
+name: Publish Tag
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  publish:
+    uses: ./.github/workflows/publish-package.yml
+    secrets:
+      NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
