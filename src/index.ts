@@ -202,7 +202,7 @@ export async function createThreadPool<WorkerType> (workerPath: string, {
       if (puddleInterface.listenerCount('exit') > 0) {
         puddleInterface.emit('exit', code, id)
       }
-
+      
       if (!thread.error) {
         const err = new Error('Worker thread exited before resolving')
         if (threadCallbacks.has(id)) {
@@ -264,6 +264,13 @@ export async function createThreadPool<WorkerType> (workerPath: string, {
     }
 
     worker.postMessage(initMsg, [port1])
+
+    // TODO: Handle message error. 
+    // Rare and possibly fatal as promises may never be resolved.
+    // Note: This happens when trying to receive an array buffer that has already been detached.
+    port2.on('messageerror', (err: Error) => {
+      // Consider pool termination and reject all open promises
+    })
 
     port2.on('message', (
       msg: BaseThreadMessage

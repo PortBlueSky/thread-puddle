@@ -1,4 +1,5 @@
 import { MessagePort } from 'worker_threads'
+import { isDetached } from './utils/is-detached'
 
 export type Transferable = MessagePort | ArrayBuffer
 export class TransferableValue {
@@ -9,9 +10,11 @@ export class TransferableValue {
     this.obj = obj
     const transfers: any = transferables || obj
     this.transferables = [].concat(transfers).map((value: any) => {
-      // TODO: Add Float64Array
       if (value instanceof Uint8Array || value instanceof Uint16Array || value instanceof Uint32Array) {
-        return value.buffer
+        value = value.buffer
+      }
+      if (value instanceof ArrayBuffer && isDetached(value)) {
+        throw new TypeError('The ArrayBuffer for transfer is already detached')
       }
       return value
     })

@@ -290,6 +290,8 @@ describe('Error Handling', () => {
     expect(fn.mock.calls[0][0]).toHaveProperty('stack', expect.stringContaining('workers/basic.js'))
   })
 
+  it.todo('forwards unhandledPromiseRejection to main event emitter')
+  
   it.todo('[Proposal] allows to manually respawn workers after error')
   it.todo('[Proposal] allows to manually respawn workers after exit')
   it.todo('[Proposal] calling respawn only spawns a worker once again, ignores all other calls')
@@ -453,7 +455,9 @@ describe('Callbacks', () => {
     expect(callback).toHaveBeenCalledWith(30)
   })
 
+  it.todo('handles async callbacks')
   it.todo('transfers result of the callback back to the thread')
+  it.todo('handles callback errors/rejects')
 })
 
 describe('Single Method Modules', () => {
