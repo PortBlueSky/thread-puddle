@@ -409,6 +409,35 @@ describe('Callbacks', () => {
     expect(callback).toHaveBeenCalledWith(3)
   })
 
+  it('resolves an async callback function on the main thread', async () => {
+    const worker = await createThreadPool<WorkerWithCallback>('./__tests__/workers/callback')
+
+    const callback = jest.fn()
+    const asyncFn = async (...args: any[]) => {
+      callback(...args)
+    }
+    await worker.withCallback(1, 2, asyncFn)
+    worker.pool.terminate()
+
+    await new Promise<void>((resolve) => setTimeout(() => resolve(), 1000))
+
+    expect(callback).toHaveBeenCalledTimes(1)
+    expect(callback).toHaveBeenCalledWith(3)
+  })
+
+  // TODO:
+  it.skip('transfers result of the callback back to the thread', async () => {
+    const worker = await createThreadPool<WorkerWithCallback>('./__tests__/workers/callback')
+
+    const asyncFn = async (...args: any[]) => {
+      return new Promise<number>((resolve) => setTimeout(() => resolve(12345), 100))
+    }
+    const result = await worker.withCallbackReturn(1, 2, asyncFn)
+    worker.pool.terminate()
+
+    expect(result).toEqual(12345)
+  })
+
   it('can call a callback function from all threads', async () => {
     const worker = await createThreadPool<WorkerWithCallback>('./__tests__/workers/callback', {
       size: 2
@@ -455,8 +484,6 @@ describe('Callbacks', () => {
     expect(callback).toHaveBeenCalledWith(30)
   })
 
-  it.todo('handles async callbacks')
-  it.todo('transfers result of the callback back to the thread')
   it.todo('handles callback errors/rejects')
 })
 
@@ -475,24 +502,4 @@ describe('Single Method Modules', () => {
 
   it.todo('can call an exported method')
   it.todo('can call a default exported method (es6 modules)')
-})
-
-describe('Alias', () => {
-  let worker: any
-
-  beforeEach(async () => {
-    worker = await createThreadPool(basicWorkerPath, {
-      size: 2
-    })
-  })
-
-  afterEach(() => {
-    worker.pool.terminate()
-  })
-
-  it('has a createThreadPool method to create a worker thread pool', async () => {
-    const value = await worker.fn('value')
-
-    expect(value).toEqual('got value')
-  })
 })
