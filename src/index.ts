@@ -125,11 +125,7 @@ export async function createThreadPool<WorkerType> (workerPath: string, {
   const threads: Thread[] = []
   const availableThreads: Thread[] = []
   const threadRequests: ThreadRequest[] = []
-  const threadCallbacks = new Map<ThreadId,  CallableStore>()
   
-  const mainFunctions = new Map<ThreadMethodKey, MainFunctionMap>()
-  const functionSequence = createSequence()
-
   let isTerminated = false
 
   const allWorkersTarget = {}
@@ -157,6 +153,8 @@ export async function createThreadPool<WorkerType> (workerPath: string, {
     availableThreads.splice(availableThreads.findIndex(thread => (thread.id === id)), 1)
   }
 
+  const threadCallableStore = new CallableStore(debugOut)
+
   const createThread = (id: ThreadId) => {
     debugOut('creating worker thread %s', id)
 
@@ -183,9 +181,7 @@ export async function createThreadPool<WorkerType> (workerPath: string, {
       callQueue: [],
       busy: false
     }
-    const threadCallableStore = new CallableStore(debugOut, id, mainFunctions, functionSequence)
-    threadCallbacks.set(id, threadCallableStore)
-
+    
     worker.on('online', () => {
       debugOut(`worker ${id} connected`)
 
@@ -261,29 +257,10 @@ export async function createThreadPool<WorkerType> (workerPath: string, {
     ) => {
       puddleInterface.emit('thread:message', msg)
 
-      threadCallableStore.handleMessage(msg)
+      const handled = threadCallableStore.handleMessage(msg, id)
 
       if (isThreadCallbackMessage(msg) || isThreadErrorMessage(msg)) {
         onReady(thread)
-        return
-      } else if (isThreadFunctionMessage(msg)) {
-        debugOut('worker %d calling function %s[%d]', id, msg.key, msg.functionId)
-        
-        const fnHolder = mainFunctions.get(msg.key)
-        if (fnHolder) {
-          // Note: the function has to be there,
-          // if it fails, something is wrong with storing them or garbage collecting
-          const mFn = fnHolder.get(msg.functionId)!
-          mFn(...msg.args)
-        }
-        return
-      } else if (isThreadFreeFunctionMessage(msg)) {
-        debugOut('worker %d calling free %s[%d]', id, msg.key, msg.functionId)
-        
-        const fnHolder = mainFunctions.get(msg.key)
-        if (fnHolder) {
-          fnHolder.delete(msg.functionId)
-        }
         return
       } else if (isThreadReadyMessage(msg)) {
         onReady(thread)
@@ -299,7 +276,9 @@ export async function createThreadPool<WorkerType> (workerPath: string, {
         return
       } 
 
-      throw new Error(`Unknown worker pool action "${(msg as BaseThreadMessage).action}"`)
+      if (!handled) {
+        throw new Error(`Unknown worker pool action "${(msg as BaseThreadMessage).action}"`)
+      }
     })
 
     threads.push(thread)
@@ -326,8 +305,7 @@ export async function createThreadPool<WorkerType> (workerPath: string, {
     debugOut('calling %s on worker %d', key, thread.id)
     thread.busy = true
 
-    const callableStore = threadCallbacks.get(thread.id)!
-    const { msg, transferables } = callableStore.createCallMessage(key, args, { resolve, reject })
+    const { msg, transferables } = threadCallableStore.createCallMessage(key, args, { resolve, reject })
 
     thread.port.postMessage(msg, transferables)
   }
@@ -400,7 +378,7 @@ export async function createThreadPool<WorkerType> (workerPath: string, {
       get: () => isTerminated
     },
     callbacks: {
-      get: () => mainFunctions
+      get: () => threadCallableStore.mainFunctions
     }
   })
 
