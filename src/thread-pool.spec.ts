@@ -8,6 +8,7 @@ import { ValidWorkerClass } from './__tests__/workers/class'
 import { WorkerWithCallback } from './__tests__/workers/callback'
 import { WorkerWithEmitter } from './__tests__/workers/eventemitter'
 import { ChainWorkerClass } from './__tests__/workers/this'
+import { isThreadFreeFunctionMessage, ThreadMessageAction } from './types/messages'
 
 debug.enabled('puddle')
 
@@ -403,6 +404,21 @@ describe('Callbacks', () => {
     await new Promise<void>((resolve) => setTimeout(() => resolve(), 1000))
 
     expect(callback).toHaveBeenCalledTimes(1)
+    expect(callback).toHaveBeenCalledWith(3)
+  })
+
+  it('can call a callback function from all threads', async () => {
+    const worker = await createThreadPool<WorkerWithCallback>('./__tests__/workers/callback', {
+      size: 2
+    })
+
+    const callback = jest.fn()
+    await worker.all.withCallback(1, 2, callback)
+    worker.pool.terminate()
+
+    await new Promise<void>((resolve) => setTimeout(() => resolve(), 1000))
+
+    expect(callback).toHaveBeenCalledTimes(2)
     expect(callback).toHaveBeenCalledWith(3)
   })
 

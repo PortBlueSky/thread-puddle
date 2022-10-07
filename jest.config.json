@@ -1,7 +1,8 @@
 {
-    "transform": {
-      "^.+\\.(t|j)s?$": "ts-jest"
-    },
-    "testRegex": "((\\.|/)(test|spec))\\.ts$",
-    "moduleFileExtensions": ["ts", "js", "json"]
-  }
+  "transform": {
+    "^.+\\.(t|j)s?$": "ts-jest"
+  },
+  "testRegex": "((\\.|/)(test|spec))\\.ts$",
+  "moduleFileExtensions": ["ts", "js", "json"],
+  "testPathIgnorePatterns": ["gc.spec.ts"]
+}
