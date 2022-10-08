@@ -12,6 +12,7 @@ import {
   ThreadMessageAction 
 } from './types/messages'
 import { FunctionId, ThreadMethodKey } from './types/general'
+import majorNodeVersion from './utils/major-node-version'
 
 const dynamicExports = require('./export-bridge')
 
@@ -72,6 +73,13 @@ parentPort.once('message', async (msg: InitMessage) => {
     port.postMessage(fnMsg)
   })
 
+  // TODO: Handle message error. 
+  // Rare and possibly fatal as promises may never be resolved.
+  // Note: This happens when trying to receive an array buffer that has already been detached.
+  port.on('messageerror', (err: Error) => {
+    // Consider pool termination and reject all open promises
+  })
+
   port.on('message', async (msg: BaseMainMessage) => {
     switch (msg.action) {
       case 'call': {
@@ -117,6 +125,7 @@ parentPort.once('message', async (msg: InitMessage) => {
               callbackId,
               result: result.obj
             }
+            
             port.postMessage(resultMsg, result.transferables)
           } else {
             const resultMsg: ThreadCallbackMessage = { 
@@ -144,6 +153,13 @@ parentPort.once('message', async (msg: InitMessage) => {
       }
     }
   })
+
+  // Note: Node < 16 does not exit and throw unhandled promise rejections
+  if (majorNodeVersion < 16) {
+    process.on('unhandledRejection', (reason, promise) => {
+      throw reason
+    });
+  }
 
   msg.port.postMessage({ action: 'ready' })
 })

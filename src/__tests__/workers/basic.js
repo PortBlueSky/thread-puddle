@@ -18,6 +18,14 @@ module.exports = {
       process.emit('error', err)
     }, 100)
   },
+  waitForUnhandledRejection: (timeout) => {
+    return new Promise(resolve => setTimeout(() => {
+      new Promise((resolve, reject) => {
+        const err = new Error('Worker Promise failure')
+        reject(err)
+      })
+    }, timeout))
+  },
   waitForUncaughtException: (timeout) => {
     return new Promise(resolve => setTimeout(() => {
       const err = new Error('Worker failure')

@@ -59,12 +59,13 @@ describe('Transferable', () => {
     // expect(arr6 instanceof Uint32Array).toBe(true)
   })
 
-  // TODO:
-  it.skip('handles error when a neutered array is accessed/transferred again from worker', async () => {
-    const arr5 = await worker.getTransferred16Array()
-    console.log(arr5)
-    const arr6 = await worker.getTransferred16Array()
-    console.log(arr6)
+  it('handles error when a neutered array is accessed/transferred again from worker', async () => {
+    await worker.getTransferred16Array()
+    try {
+      await worker.getTransferred16Array()
+    } catch(err: any) {
+      expect(err.message).toMatch('The ArrayBuffer for transfer is already detached')
+    }
   });
 
   it('does not wrap ArrayBuffers transferred directly', async () => {

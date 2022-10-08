@@ -80,9 +80,10 @@ describe('Basic Features', () => {
 
     const counts = countBy([value1, value2, value3, value4])
     expect(counts).toEqual({
-      'got value 9': 2,
-      'got value 10': 2
+      'got value 10': 2,
+      'got value 11': 2
     })
+    expect(Object.keys(counts).length).toEqual(2)
   })
 
   it('always only calls one method per worker', async () => {
@@ -100,8 +101,8 @@ describe('Basic Features', () => {
     const [value1, value2] = await worker.all.fnWorkerNum('value')
 
     expect([value1, value2]).toEqual([
-      'got value 13',
-      'got value 14'
+      'got value 14',
+      'got value 15'
     ])
   })
 
@@ -116,8 +117,8 @@ describe('Basic Features', () => {
       'got async one',
       'got async two',
       [
-        'got value 15',
-        'got value 16'
+        'got value 16',
+        'got value 17'
       ]
     ])
   })
@@ -207,19 +208,11 @@ describe('Nested Threads', () => {
 })
 
 describe('Error Handling', () => {
-  let worker: any
-
-  beforeEach(async () => {
-    worker = await createThreadPool(basicWorkerPath, {
+  it('forwards worker method errors with worker stack trace', async () => {
+    const worker:any  = await createThreadPool(basicWorkerPath, {
       size: 2
     })
-  })
 
-  afterEach(() => {
-    worker.pool.terminate()
-  })
-
-  it('forwards worker method errors with worker stack trace', async () => {
     try {
       await worker.fnError('worker triggered this error message')
       expect(false).toBe(true)
@@ -227,9 +220,14 @@ describe('Error Handling', () => {
       expect(err).toHaveProperty('message', 'worker triggered this error message')
       expect(err).toHaveProperty('stack', expect.stringContaining('workers/basic.js'))
     }
+    worker.pool.terminate()
   })
 
   it('forwards worker process errors within method', async () => {
+    const worker:any  = await createThreadPool(basicWorkerPath, {
+      size: 2
+    })
+
     try {
       await worker.triggerProcessError()
       expect(false).toBe(true)
@@ -237,34 +235,58 @@ describe('Error Handling', () => {
       expect(err).toHaveProperty('message', 'Worker failure')
       expect(err).toHaveProperty('stack', expect.stringContaining('workers/basic.js'))
     }
+    worker.pool.terminate()
   })
 
-  it('respawns worker afer uncaught exceptions', async () => {
+  it('terminates the thread pool on uncaught exception', async () => {
+    const worker:any  = await createThreadPool(basicWorkerPath, {
+      size: 2
+    })
+
     await worker.triggerUncaughtException()
     await new Promise((resolve) => setTimeout(resolve, 500))
 
-    expect(worker.pool).toHaveProperty('size', 2)
+    expect(worker.pool).toHaveProperty('size', 0)
+    expect(worker.pool.isTerminated).toBe(true)
   })
 
   it('rejects open method calls when a worker crashes', async () => {
+    const worker:any  = await createThreadPool(basicWorkerPath, {
+      size: 2
+    })
+
     const result = await Promise.all([
       worker.waitForUncaughtException(10).catch((err: Error) => err),
-      worker.waitForUncaughtException(10).catch((err: Error) => err),
-      worker.waitForUncaughtException(10).catch((err: Error) => err),
-      worker.waitForUncaughtException(10).catch((err: Error) => err)
+      worker.waitForUncaughtException(100).catch((err: Error) => err),
+      worker.waitForUncaughtException(100).catch((err: Error) => err),
+      worker.waitForUncaughtException(100).catch((err: Error) => err)
     ])
-    result.map(err => expect(err).toHaveProperty('message', 'Worker failure'))
+    const mapBy = countBy(result.map((err) => err.message))
+    
+    expect(Object.keys(mapBy)).toHaveLength(2)
+    expect(mapBy).toHaveProperty('Worker failure', 2)
+    
+    worker.pool.terminate()
   })
 
   it('rejects open method calls when worker exits', async () => {
+    const worker:any  = await createThreadPool(basicWorkerPath, {
+      size: 2
+    })
+
     const result = await Promise.all([
       worker.exitWorker(10).catch((err: Error) => err),
       worker.exitWorker(10).catch((err: Error) => err)
     ])
     result.map(err => expect(err).toHaveProperty('message', 'Worker thread exited before resolving'))
+    worker.pool.terminate()
   })
 
   it('rejects waiting method calls when all workers exited', async () => {
+    const worker:any  = await createThreadPool(basicWorkerPath, {
+      size: 2
+    })
+
     const [one, two, three, four] = await Promise.all([
       worker.exitWorker(10).catch((err: Error) => err),
       worker.exitWorker(10).catch((err: Error) => err),
@@ -276,9 +298,14 @@ describe('Error Handling', () => {
     expect(two).toHaveProperty('message', 'Worker thread exited before resolving')
     expect(three).toHaveProperty('message', 'All workers exited before resolving (use an error event handler or DEBUG=puddle:*)')
     expect(four).toHaveProperty('message', 'All workers exited before resolving (use an error event handler or DEBUG=puddle:*)')
+    worker.pool.terminate()
   })
 
   it('emits an error event when a worker errors', async () => {
+    const worker:any  = await createThreadPool(basicWorkerPath, {
+      size: 2
+    })
+
     const fn = jest.fn()
     worker.pool.on('error', fn)
 
@@ -288,11 +315,30 @@ describe('Error Handling', () => {
     expect(fn).toHaveBeenCalledTimes(1)
     expect(fn.mock.calls[0][0]).toHaveProperty('message', 'Worker failure')
     expect(fn.mock.calls[0][0]).toHaveProperty('stack', expect.stringContaining('workers/basic.js'))
+    worker.pool.terminate()
+  })
+
+  it('rejects open method calls when a worker throws unhandled rejection', async () => {
+    const worker:any  = await createThreadPool(basicWorkerPath, {
+      size: 2
+    })
+
+    const result = await Promise.all([
+      worker.waitForUnhandledRejection(10).catch((err: Error) => err),
+      worker.waitForUnhandledRejection(100).catch((err: Error) => err),
+      worker.waitForUnhandledRejection(100).catch((err: Error) => err),
+      worker.waitForUnhandledRejection(100).catch((err: Error) => err)
+    ])
+    const mapBy = countBy(result.map((err) => err.message))
+    
+    expect(Object.keys(mapBy)).toHaveLength(2)
+    expect(mapBy).toHaveProperty('Worker Promise failure', 2)
+    
+    worker.pool.terminate()
   })
 
   it.todo('[Proposal] allows to manually respawn workers after error')
   it.todo('[Proposal] allows to manually respawn workers after exit')
-  it.todo('[Proposal] calling respawn only spawns a worker once again, ignores all other calls')
 })
 
 describe('ts-bridge', () => {
@@ -407,6 +453,35 @@ describe('Callbacks', () => {
     expect(callback).toHaveBeenCalledWith(3)
   })
 
+  it('resolves an async callback function on the main thread', async () => {
+    const worker = await createThreadPool<WorkerWithCallback>('./__tests__/workers/callback')
+
+    const callback = jest.fn()
+    const asyncFn = async (...args: any[]) => {
+      callback(...args)
+    }
+    await worker.withCallback(1, 2, asyncFn)
+    worker.pool.terminate()
+
+    await new Promise<void>((resolve) => setTimeout(() => resolve(), 1000))
+
+    expect(callback).toHaveBeenCalledTimes(1)
+    expect(callback).toHaveBeenCalledWith(3)
+  })
+
+  // TODO:
+  it.skip('transfers result of the callback back to the thread', async () => {
+    const worker = await createThreadPool<WorkerWithCallback>('./__tests__/workers/callback')
+
+    const asyncFn = async (...args: any[]) => {
+      return new Promise<number>((resolve) => setTimeout(() => resolve(12345), 100))
+    }
+    const result = await worker.withCallbackReturn(1, 2, asyncFn)
+    worker.pool.terminate()
+
+    expect(result).toEqual(12345)
+  })
+
   it('can call a callback function from all threads', async () => {
     const worker = await createThreadPool<WorkerWithCallback>('./__tests__/workers/callback', {
       size: 2
@@ -453,7 +528,62 @@ describe('Callbacks', () => {
     expect(callback).toHaveBeenCalledWith(30)
   })
 
-  it.todo('transfers result of the callback back to the thread')
+  it('forwards callback errors to callback:error event', async () => {
+    const worker = await createThreadPool<WorkerWithCallback>('./__tests__/workers/callback')
+
+    const handler = jest.fn()
+    worker.pool.on('callback:error', handler)
+    const err = new Error('callback threw')
+    const fn = (val: number) => {
+      throw err
+    }
+    
+    await worker.withCallback(1, 2, fn)
+    
+    await new Promise<void>((resolve) => setTimeout(() => resolve(), 100))
+    worker.pool.terminate()
+
+    expect(handler).toHaveBeenCalledTimes(1)
+    expect(handler).toHaveBeenCalledWith(err, expect.any(Number))
+  })
+
+  it('forwards callback rejects to callback:error event', async () => {
+    const worker = await createThreadPool<WorkerWithCallback>('./__tests__/workers/callback')
+
+    const handler = jest.fn()
+    worker.pool.on('callback:error', handler)
+    const err = new Error('callback rejected')
+    const fn = async (val: number) => {
+      return new Promise((resolve, reject) => setTimeout(() => reject(err), 50))
+    }
+    
+    await worker.withCallback(1, 2, fn)
+    
+    await new Promise<void>((resolve) => setTimeout(() => resolve(), 100))
+    worker.pool.terminate()
+
+    expect(handler).toHaveBeenCalledTimes(1)
+    expect(handler).toHaveBeenCalledWith(err, expect.any(Number))
+  })
+
+  it.skip('throws if there is no callback:error listener', async () => {
+    const worker = await createThreadPool<WorkerWithCallback>('./__tests__/workers/callback')
+
+    const err = new Error('callback rejected')
+    const fn = async (val: number) => {
+      return new Promise((resolve, reject) => setTimeout(() => reject(err), 50))
+    }
+
+    // TODO: How to catch the broken promise chain here?
+        
+    await worker.withCallback(1, 2, fn)
+    
+    await new Promise<void>((resolve) => setTimeout(() => resolve(), 100))
+    worker.pool.terminate()
+  })
+
+  it.todo('does not handle callbacks when already terminated')
+  it.todo('can transfer objects with callback')
 })
 
 describe('Single Method Modules', () => {
@@ -471,24 +601,4 @@ describe('Single Method Modules', () => {
 
   it.todo('can call an exported method')
   it.todo('can call a default exported method (es6 modules)')
-})
-
-describe('Alias', () => {
-  let worker: any
-
-  beforeEach(async () => {
-    worker = await createThreadPool(basicWorkerPath, {
-      size: 2
-    })
-  })
-
-  afterEach(() => {
-    worker.pool.terminate()
-  })
-
-  it('has a createThreadPool method to create a worker thread pool', async () => {
-    const value = await worker.fn('value')
-
-    expect(value).toEqual('got value')
-  })
 })

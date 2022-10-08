@@ -1,4 +1,5 @@
 const { withTransfer } = require('../../')
+const util = require('util')
 
 const uint8Array = new Uint8Array([1, 2, 3, 4])
 const uint16Array = new Uint16Array([1, 2, 3, 4])
@@ -11,7 +12,10 @@ module.exports = {
   get16Array: () => uint16Array,
   get32Array: () => uint32Array,
   getTransferredArray: () => withTransfer(uint8Array),
-  getTransferred16Array: () => withTransfer(uint16Array),
+  getTransferred16Array: () => {
+    const tr = withTransfer(uint16Array)
+    return tr
+  },
   getTransferred32Array: () => withTransfer(uint32Array),
   setArray: (arr) => {
     if (!(arr instanceof Uint8Array)) {
