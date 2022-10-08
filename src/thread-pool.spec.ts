@@ -1,6 +1,6 @@
 /* eslint-env jest */
 import path from 'path'
-import { createThreadPool, FilterAndWrap } from './index'
+import { createThreadPool, WrapWorkerType } from './index'
 import debug from 'debug'
 import majorVersion from './utils/major-node-version'
 import { ValidWorker } from './__tests__/workers/valid'
@@ -25,7 +25,7 @@ const countBy = (list: string[]) => list.reduce((acc: Record<string, number>, ke
 }, {})
 
 describe('Basic Features', () => {
-  let worker: FilterAndWrap<typeof BasicWorker>
+  let worker: WrapWorkerType<typeof BasicWorker>
 
   beforeEach(async () => {
     worker = await createThreadPool<typeof BasicWorker>('./__tests__/workers/basic', {
@@ -194,7 +194,7 @@ describe('Nested Threads', () => {
   let worker: any
 
   beforeEach(async () => {
-    worker = await createThreadPool(path.resolve(__dirname, './__tests__/workers/nest.js'))
+    worker = await createThreadPool('./__tests__/workers/nest')
     await worker.setup()
   })
 

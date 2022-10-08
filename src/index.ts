@@ -69,27 +69,17 @@ type WrapReturnType<Base extends TypeWithMethods> = {
 // TODO: Fix usage of interface vs. type
 // Even though this complains, the type is inferred from the template correctly,
 // working for classes/interfaces and types
-export type FilterAndWrap<Base> = WrapReturnType<FilterType<Required<Base>, Function>> & BaseWorker & { all: FilterAndWrap<Base> }
+type FilterAndWrap<Base> = WrapReturnType<FilterType<Required<Base>, Function>> 
 
-export async function createThreadPool<WorkerType> (workerPath: string, {
+export type WrapWorkerType<Base> = FilterAndWrap<Base> & BaseWorker & { all: FilterAndWrap<Base> }
+
+export async function createThreadPool<T> (workerPath: string, {
   size = 1,
   workerOptions = {},
   startupTimeout = 30000,
   typecheck = false
-}: ThreadPoolOptions = {}): Promise<FilterAndWrap<WorkerType>> {
+}: ThreadPoolOptions = {}) {
   debugOut('carving out a puddle...')
-
-  type TargetWorkerType = BaseWorker & { all: FilterAndWrap<WorkerType> }
-  type ExtendedWorkerType = TargetWorkerType & FilterAndWrap<WorkerType>
-
-  // Based on: https://github.com/Microsoft/TypeScript/issues/20846#issuecomment-582183737
-  interface PoolProxyConstructor {
-    new <T, H extends object, K extends BaseWorker>(target: T, handler: ProxyHandler<H>): K
-  }
-
-  interface PoolProxyAllConstructor {
-    new <T, H extends object, K extends WorkerType>(target: T, handler: ProxyHandler<H>): K
-  }
 
   // Resolve relative worker path
   let resolvedWorkerPath = workerPath
@@ -105,6 +95,26 @@ export async function createThreadPool<WorkerType> (workerPath: string, {
   }
 
   const { ext: resolvedWorkerExtension } = path.parse(require.resolve(resolvedWorkerPath))
+  
+  // TODO: Automatically infer types from worker path if not given
+  // const implicitWorkerType = await import('./__tests__/workers/basic');
+  // type WorkerType = unknown extends T
+  //   ? typeof implicitWorkerType
+  //   : T;
+  type WorkerType = T
+
+  
+  type TargetWorkerType = BaseWorker & { all: FilterAndWrap<WorkerType> }
+  type ExtendedWorkerType = TargetWorkerType & FilterAndWrap<WorkerType>
+
+  // Based on: https://github.com/Microsoft/TypeScript/issues/20846#issuecomment-582183737
+  interface PoolProxyConstructor {
+    new <T, H extends object, K extends BaseWorker>(target: T, handler: ProxyHandler<H>): K
+  }
+
+  interface PoolProxyAllConstructor {
+    new <T, H extends object, K extends WorkerType>(target: T, handler: ProxyHandler<H>): K
+  }
 
   const threads: WorkerThread[] = []
   const availableThreads: WorkerThread[] = []
