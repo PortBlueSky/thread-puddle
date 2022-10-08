@@ -69,14 +69,14 @@ type WrapReturnType<Base extends TypeWithMethods> = {
 // TODO: Fix usage of interface vs. type
 // Even though this complains, the type is inferred from the template correctly,
 // working for classes/interfaces and types
-type FilterAndWrap<Base> = WrapReturnType<FilterType<Required<Base>, Function>>
+export type FilterAndWrap<Base> = WrapReturnType<FilterType<Required<Base>, Function>> & BaseWorker & { all: FilterAndWrap<Base> }
 
 export async function createThreadPool<WorkerType> (workerPath: string, {
   size = 1,
   workerOptions = {},
   startupTimeout = 30000,
   typecheck = false
-}: ThreadPoolOptions = {}): Promise<FilterAndWrap<WorkerType> & BaseWorker & { all: FilterAndWrap<WorkerType> }> {
+}: ThreadPoolOptions = {}): Promise<FilterAndWrap<WorkerType>> {
   debugOut('carving out a puddle...')
 
   type TargetWorkerType = BaseWorker & { all: FilterAndWrap<WorkerType> }

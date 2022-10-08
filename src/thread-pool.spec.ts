@@ -1,6 +1,6 @@
 /* eslint-env jest */
 import path from 'path'
-import { createThreadPool } from './index'
+import { createThreadPool, FilterAndWrap } from './index'
 import debug from 'debug'
 import majorVersion from './utils/major-node-version'
 import { ValidWorker } from './__tests__/workers/valid'
@@ -8,11 +8,11 @@ import { ValidWorkerClass } from './__tests__/workers/class'
 import { WorkerWithCallback } from './__tests__/workers/callback'
 import { WorkerWithEmitter } from './__tests__/workers/eventemitter'
 import { ChainWorkerClass } from './__tests__/workers/this'
-import { isThreadFreeFunctionMessage, ThreadMessageAction } from './types/messages'
+import BasicWorker from './__tests__/workers/basic'
 
 debug.enabled('puddle')
 
-const basicWorkerPath = './__tests__/workers/basic.js'
+const basicWorkerPath = './__tests__/workers/basic'
 const startupFailWorkerPath = './__tests__/workers/startup-fail.js'
 const noObjectWorkerPath = './__tests__/workers/no-object.js'
 const invalidTsWorkerPath = './__tests__/workers/invalid-ts.ts'
@@ -25,10 +25,10 @@ const countBy = (list: string[]) => list.reduce((acc: Record<string, number>, ke
 }, {})
 
 describe('Basic Features', () => {
-  let worker: any
+  let worker: FilterAndWrap<typeof BasicWorker>
 
   beforeEach(async () => {
-    worker = await createThreadPool<any>('./__tests__/workers/basic.js', {
+    worker = await createThreadPool<typeof BasicWorker>('./__tests__/workers/basic', {
       size: 2,
       workerOptions: {
         workerData: {
@@ -65,6 +65,7 @@ describe('Basic Features', () => {
 
   it('throws error if method is not available on worker', async () => {
     try {
+      // @ts-ignore
       await worker.notWorkerMethod()
       expect(false).toBe(true)
     } catch (err) {
@@ -151,6 +152,7 @@ describe('Basic Features', () => {
     expect(worker.pool).toHaveProperty('isTerminated', true)
   })
 
+  it.todo('throws module not found if path to worker cannot be resolved')
   it.todo('allows to call methods on the parent thread')
   it.todo('can call a method on a specific worker directly')
   it.todo('warns if call queue becomes too large')
@@ -218,7 +220,7 @@ describe('Error Handling', () => {
       expect(false).toBe(true)
     } catch (err) {
       expect(err).toHaveProperty('message', 'worker triggered this error message')
-      expect(err).toHaveProperty('stack', expect.stringContaining('workers/basic.js'))
+      expect(err).toHaveProperty('stack', expect.stringContaining('workers/basic.ts'))
     }
     worker.pool.terminate()
   })
@@ -233,7 +235,7 @@ describe('Error Handling', () => {
       expect(false).toBe(true)
     } catch (err) {
       expect(err).toHaveProperty('message', 'Worker failure')
-      expect(err).toHaveProperty('stack', expect.stringContaining('workers/basic.js'))
+      expect(err).toHaveProperty('stack', expect.stringContaining('workers/basic.ts'))
     }
     worker.pool.terminate()
   })
@@ -314,7 +316,7 @@ describe('Error Handling', () => {
 
     expect(fn).toHaveBeenCalledTimes(1)
     expect(fn.mock.calls[0][0]).toHaveProperty('message', 'Worker failure')
-    expect(fn.mock.calls[0][0]).toHaveProperty('stack', expect.stringContaining('workers/basic.js'))
+    expect(fn.mock.calls[0][0]).toHaveProperty('stack', expect.stringContaining('workers/basic.ts'))
     worker.pool.terminate()
   })
 
