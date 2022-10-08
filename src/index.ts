@@ -3,17 +3,18 @@ import { EventEmitter } from 'events'
 import createDebug from 'debug'
 import getCallsites from './utils/callsites'
 
-import { TransferableValue } from './Transferable'
 export { withTransfer } from './Transferable'
-import { MessagePort, Worker, MessageChannel, isMainThread } from 'worker_threads'
+import { isMainThread, WorkerOptions } from 'worker_threads'
 import hasTSNode from './utils/has-ts-node'
-import { CallbackId, ThreadId, ThreadMethodKey } from './types/general'
-import { BaseThreadMessage, CallMessage, InitMessage, isThreadCallbackMessage, isThreadErrorMessage, isThreadFreeFunctionMessage, isThreadFunctionMessage, isThreadReadyMessage, isThreadStartupErrorMessage, MainMessageAction, ThreadCallbackMessage, ThreadErrorMessage, ThreadFreeFunctionMessage, ThreadFunctionMessage, ThreadMessageAction, ThreadReadyMessage } from './types/messages'
+import { ThreadMethodKey } from './types/general'
 import { createSequence } from './utils/sequence'
 import { CallableStore } from './components/callable-store'
+import { WorkerThread } from './WorkerThread'
 
 const { threadId: dynamicThreadId, debug: dynamicDebug } = require('./export-bridge')
 export const threadId = dynamicThreadId
+
+const workerThreadIdSequence = createSequence({ start: 1 })
 
 let debugOut = createDebug('puddle:master')
 export let debug = debugOut
@@ -22,34 +23,15 @@ if (!isMainThread) {
   debug = dynamicDebug
 }
 
-let __puddle__threadIdOffset: number = 1
-
-export type Thread = {
-  id: ThreadId
-  connected: boolean
-  worker: Worker
-  port: MessagePort
-  error: Error | boolean
-  callQueue: QueuedCall[]
-  busy: boolean
-}
-
-export interface QueuedCall {
-  key: ThreadMethodKey
-  args: Array<any>
-  resolve: (result: any) => void,
-  reject: (error: Error) => void
-}
-
 export interface ThreadRequest {
-  resolve(thread: Thread): void
+  resolve(thread: WorkerThread): void
   reject(error: Error): void
 }
 
 export type ThreadPoolOptions = {
   size?: number
   typecheck?: boolean
-  workerOptions?: any // TODO: Use worker options type from node types
+  workerOptions?: WorkerOptions
   startupTimeout?: number
 }
 
@@ -122,8 +104,8 @@ export async function createThreadPool<WorkerType> (workerPath: string, {
 
   const { ext: resolvedWorkerExtension } = path.parse(require.resolve(resolvedWorkerPath))
 
-  const threads: Thread[] = []
-  const availableThreads: Thread[] = []
+  const threads: WorkerThread[] = []
+  const availableThreads: WorkerThread[] = []
   const threadRequests: ThreadRequest[] = []
   
   let isTerminated = false
@@ -131,32 +113,15 @@ export async function createThreadPool<WorkerType> (workerPath: string, {
   const allWorkersTarget = {}
   const puddleInterface = new EventEmitter()
 
-  const onReady = (thread: Thread) => {
-    if (thread.callQueue.length > 0) {
-      const { key, args, resolve, reject } = thread.callQueue.shift() as QueuedCall
-      callOnThread(thread, key, args, resolve, reject)
-      return
-    }
-
-    if (threadRequests.length > 0) {
-      const request = threadRequests.shift()
-      request!.resolve(thread)
-      return
-    }
-
-    thread.busy = false
-    availableThreads.push(thread)
-  }
-
-  const removeThread = ({ id }: Thread) => {
+  const removeThread = ({ id }: WorkerThread) => {
     threads.splice(threads.findIndex(thread => (thread.id === id)), 1)
     availableThreads.splice(availableThreads.findIndex(thread => (thread.id === id)), 1)
   }
 
   const threadCallableStore = new CallableStore(debugOut)
 
-  const createThread = (id: ThreadId) => {
-    debugOut('creating worker thread %s', id)
+  const createThread = () => {
+    debugOut('creating worker thread')
 
     const bridgeWorkerPath = path.resolve(__dirname, 'worker')
     const { ext: bridgeWorkerExtension } = path.parse(require.resolve(bridgeWorkerPath))
@@ -170,39 +135,37 @@ export async function createThreadPool<WorkerType> (workerPath: string, {
       }
     }
 
-    const worker = new Worker(workerString, { ...workerOptions, eval: true })
-    const { port1, port2 } = new MessageChannel()
-    const thread: Thread = {
-      id,
-      connected: false,
-      worker,
-      port: port2,
-      error: false,
-      callQueue: [],
-      busy: false
-    }
-    
-    worker.on('online', () => {
-      debugOut(`worker ${id} connected`)
+    const thread = new WorkerThread(workerThreadIdSequence.next(), threadId, debugOut, workerString, resolvedWorkerPath, workerOptions, threadCallableStore)
 
-      thread.connected = true
+    debugOut('creates worker thread %s', thread.id)
+
+    thread.on('ready', () => {
+      if (threadRequests.length > 0) {
+        const request = threadRequests.shift()
+        request!.resolve(thread)
+        return
+      }
+  
+      availableThreads.push(thread)
     })
 
-    worker.on('exit', (code: number) => {
-      debugOut('worker %d exited with code %d', id, code)
+    thread.on('message', (msg, id) => {
+      puddleInterface.emit('thread:message', msg, id)
+    })
 
-      if (puddleInterface.listenerCount('exit') > 0) {
-        puddleInterface.emit('exit', code, id)
+    thread.on('startup-error', (err) => {
+      if (threadRequests.length > 0) {
+        const request = threadRequests.shift()
+        request!.reject(err)
       }
-      
-      if (!thread.error) {
-        const err = new Error('Worker thread exited before resolving')
-        threadCallableStore.rejectAll(err)
-      }
-      
+    })
+
+    thread.on('exit', (code, id) => {
+      puddleInterface.emit('exit', code, id)
+
       // TODO: Ensure thread is not removed after being created from error
       removeThread(thread)
-
+      
       if (threads.length === 0) {
         terminate()
 
@@ -213,71 +176,16 @@ export async function createThreadPool<WorkerType> (workerPath: string, {
       }
     })
 
-    worker.on('error', (err) => {
-      debugOut(`worker ${id} Error: %s`, err.message)
-
+    thread.on('error', (err, id) => {
       if (puddleInterface.listenerCount('error') > 0) {
-        puddleInterface.emit('error', err)
+        puddleInterface.emit('error', err, id)
       }
 
-      // TODO: Reject only the call that errored,
-      // -> recall all other
-      if (!isTerminated) {
-        threadCallableStore.rejectAll(err)
-
-        thread.error = err
-
-        // TODO: Make auto respawn optional
-        if (thread.connected) {
-          debugOut(`restarting worker ${id} after uncaught error`)
-          createThread(id)
-        }
-      }
-    })
-
-    const initMsg: InitMessage = {
-      action: MainMessageAction.INIT,
-      workerPath: resolvedWorkerPath,
-      port: port1,
-      id,
-      parentId: threadId
-    }
-
-    worker.postMessage(initMsg, [port1])
-
-    // TODO: Handle message error. 
-    // Rare and possibly fatal as promises may never be resolved.
-    // Note: This happens when trying to receive an array buffer that has already been detached.
-    port2.on('messageerror', (err: Error) => {
-      // Consider pool termination and reject all open promises
-    })
-
-    port2.on('message', (
-      msg: BaseThreadMessage
-    ) => {
-      puddleInterface.emit('thread:message', msg)
-
-      const handled = threadCallableStore.handleMessage(msg, id)
-
-      if (isThreadCallbackMessage(msg) || isThreadErrorMessage(msg)) {
-        onReady(thread)
-        return
-      } else if (isThreadReadyMessage(msg)) {
-        onReady(thread)
-        return
-      } else if (isThreadStartupErrorMessage(msg)) {
-        if (threadRequests.length > 0) {
-          const errorMsg = msg as ThreadErrorMessage
-          const request = threadRequests.shift()
-          const err = new Error(errorMsg.message)
-          err.stack = errorMsg.stack
-          request!.reject(err)
-        }
-        return
-      } 
-
-      if (!handled) {
-        throw new Error(`Unknown worker pool action "${(msg as BaseThreadMessage).action}"`)
+      // TODO: Make auto respawn optional
+      if (thread.connected) {
+        debugOut(`restarting worker after uncaught error`)
+        
+        createThread()
       }
     })
 
@@ -286,31 +194,11 @@ export async function createThreadPool<WorkerType> (workerPath: string, {
 
   debugOut('filling puddle with thread liquid...')
 
-  const idStart: ThreadId = __puddle__threadIdOffset
-  const idEnd: ThreadId = idStart + size
-
-  for (let id: ThreadId = idStart; id < idEnd; id += 1) {
-    createThread(id)
+  for (let i = 0; i < size; i += 1) {
+    createThread()
   }
 
-  __puddle__threadIdOffset += size
-
-  function callOnThread (
-    thread: Thread, 
-    key: ThreadMethodKey, 
-    args: any[], 
-    resolve: (thread: Thread) => void, 
-    reject: (error: Error) => void
-  ) {
-    debugOut('calling %s on worker %d', key, thread.id)
-    thread.busy = true
-
-    const { msg, transferables } = threadCallableStore.createCallMessage(key, args, { resolve, reject })
-
-    thread.port.postMessage(msg, transferables)
-  }
-
-  const getAvailableThread = () => new Promise<Thread>((resolve, reject) => {
+  const getAvailableThread = () => new Promise<WorkerThread>((resolve, reject) => {
     if (isTerminated) {
       return reject(new Error('Worker pool already terminated.'))
     }
@@ -318,7 +206,7 @@ export async function createThreadPool<WorkerType> (workerPath: string, {
     if (availableThreads.length > 0) {
       const thread = availableThreads.shift()
       debugOut('Resolving available worker %d', thread!.id)
-      return resolve(thread as Thread)
+      return resolve(thread as WorkerThread)
     }
 
     const threadRequest: ThreadRequest = { resolve, reject }
@@ -336,7 +224,7 @@ export async function createThreadPool<WorkerType> (workerPath: string, {
     isTerminated = true
     
     for (const thread of threads) {
-      thread.worker.terminate()
+      thread.terminate()
     }
   }
 
@@ -394,11 +282,7 @@ export async function createThreadPool<WorkerType> (workerPath: string, {
 
       return (...args: any[]) => Promise.all(
         threads.map(thread => new Promise((resolve, reject) => {
-          if (!thread.busy) {
-            callOnThread(thread, key, args, resolve, reject)
-            return
-          }
-          thread.callQueue.push({ key, args, resolve, reject })
+          thread.callOnThread(key, args, resolve, reject)
         }))
       )
     }
@@ -433,7 +317,7 @@ export async function createThreadPool<WorkerType> (workerPath: string, {
       return async (...args: any[]) => {
         const result = await new Promise((resolve, reject) => {
           getAvailableThread()
-            .then((thread: Thread) => callOnThread(thread, key, args, resolve, reject))
+            .then((thread: WorkerThread) => thread.callOnThread(key, args, resolve, reject))
             .catch(err => reject(err))
         })
         

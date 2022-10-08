@@ -80,9 +80,10 @@ describe('Basic Features', () => {
 
     const counts = countBy([value1, value2, value3, value4])
     expect(counts).toEqual({
-      'got value 9': 2,
-      'got value 10': 2
+      'got value 10': 2,
+      'got value 11': 2
     })
+    expect(Object.keys(counts).length).toEqual(2)
   })
 
   it('always only calls one method per worker', async () => {
@@ -100,8 +101,8 @@ describe('Basic Features', () => {
     const [value1, value2] = await worker.all.fnWorkerNum('value')
 
     expect([value1, value2]).toEqual([
-      'got value 13',
-      'got value 14'
+      'got value 14',
+      'got value 15'
     ])
   })
 
@@ -116,8 +117,8 @@ describe('Basic Features', () => {
       'got async one',
       'got async two',
       [
-        'got value 15',
-        'got value 16'
+        'got value 16',
+        'got value 17'
       ]
     ])
   })
