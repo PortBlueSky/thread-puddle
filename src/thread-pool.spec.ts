@@ -238,7 +238,7 @@ describe('Error Handling', () => {
     worker.pool.terminate()
   })
 
-  it('respawns worker after uncaught exceptions', async () => {
+  it('terminates the thread pool on uncaught exception', async () => {
     const worker:any  = await createThreadPool(basicWorkerPath, {
       size: 2
     })
@@ -246,8 +246,8 @@ describe('Error Handling', () => {
     await worker.triggerUncaughtException()
     await new Promise((resolve) => setTimeout(resolve, 500))
 
-    expect(worker.pool).toHaveProperty('size', 2)
-    worker.pool.terminate()
+    expect(worker.pool).toHaveProperty('size', 0)
+    expect(worker.pool.isTerminated).toBe(true)
   })
 
   it('rejects open method calls when a worker crashes', async () => {
@@ -257,11 +257,15 @@ describe('Error Handling', () => {
 
     const result = await Promise.all([
       worker.waitForUncaughtException(10).catch((err: Error) => err),
-      worker.waitForUncaughtException(10).catch((err: Error) => err),
-      worker.waitForUncaughtException(10).catch((err: Error) => err),
-      worker.waitForUncaughtException(10).catch((err: Error) => err)
+      worker.waitForUncaughtException(100).catch((err: Error) => err),
+      worker.waitForUncaughtException(100).catch((err: Error) => err),
+      worker.waitForUncaughtException(100).catch((err: Error) => err)
     ])
-    result.map(err => expect(err).toHaveProperty('message', 'Worker failure'))
+    const mapBy = countBy(result.map((err) => err.message))
+    
+    expect(Object.keys(mapBy)).toHaveLength(2)
+    expect(mapBy).toHaveProperty('Worker failure', 2)
+    
     worker.pool.terminate()
   })
 

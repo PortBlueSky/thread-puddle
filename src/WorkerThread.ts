@@ -61,8 +61,6 @@ export class WorkerThread extends EventEmitter {
     worker.on('error', (err) => {
       this.debug(`worker ${id} Error: %s`, err.message)
 
-      // TODO: Reject only the call that errored,
-      // -> recall all other
       if (!this.isTerminated) {
         callableStore.rejectAll(err)
         

@@ -181,12 +181,7 @@ export async function createThreadPool<WorkerType> (workerPath: string, {
         puddleInterface.emit('error', err, id)
       }
 
-      // TODO: Make auto respawn optional
-      if (thread.connected) {
-        debugOut(`restarting worker after uncaught error`)
-        
-        createThread()
-      }
+      terminate()
     })
 
     threads.push(thread)
