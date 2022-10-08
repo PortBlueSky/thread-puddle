@@ -208,19 +208,11 @@ describe('Nested Threads', () => {
 })
 
 describe('Error Handling', () => {
-  let worker: any
-
-  beforeEach(async () => {
-    worker = await createThreadPool(basicWorkerPath, {
+  it('forwards worker method errors with worker stack trace', async () => {
+    const worker:any  = await createThreadPool(basicWorkerPath, {
       size: 2
     })
-  })
 
-  afterEach(() => {
-    worker.pool.terminate()
-  })
-
-  it('forwards worker method errors with worker stack trace', async () => {
     try {
       await worker.fnError('worker triggered this error message')
       expect(false).toBe(true)
@@ -228,9 +220,14 @@ describe('Error Handling', () => {
       expect(err).toHaveProperty('message', 'worker triggered this error message')
       expect(err).toHaveProperty('stack', expect.stringContaining('workers/basic.js'))
     }
+    worker.pool.terminate()
   })
 
   it('forwards worker process errors within method', async () => {
+    const worker:any  = await createThreadPool(basicWorkerPath, {
+      size: 2
+    })
+
     try {
       await worker.triggerProcessError()
       expect(false).toBe(true)
@@ -238,16 +235,26 @@ describe('Error Handling', () => {
       expect(err).toHaveProperty('message', 'Worker failure')
       expect(err).toHaveProperty('stack', expect.stringContaining('workers/basic.js'))
     }
+    worker.pool.terminate()
   })
 
-  it('respawns worker afer uncaught exceptions', async () => {
+  it('respawns worker after uncaught exceptions', async () => {
+    const worker:any  = await createThreadPool(basicWorkerPath, {
+      size: 2
+    })
+
     await worker.triggerUncaughtException()
     await new Promise((resolve) => setTimeout(resolve, 500))
 
     expect(worker.pool).toHaveProperty('size', 2)
+    worker.pool.terminate()
   })
 
   it('rejects open method calls when a worker crashes', async () => {
+    const worker:any  = await createThreadPool(basicWorkerPath, {
+      size: 2
+    })
+
     const result = await Promise.all([
       worker.waitForUncaughtException(10).catch((err: Error) => err),
       worker.waitForUncaughtException(10).catch((err: Error) => err),
@@ -255,17 +262,27 @@ describe('Error Handling', () => {
       worker.waitForUncaughtException(10).catch((err: Error) => err)
     ])
     result.map(err => expect(err).toHaveProperty('message', 'Worker failure'))
+    worker.pool.terminate()
   })
 
   it('rejects open method calls when worker exits', async () => {
+    const worker:any  = await createThreadPool(basicWorkerPath, {
+      size: 2
+    })
+
     const result = await Promise.all([
       worker.exitWorker(10).catch((err: Error) => err),
       worker.exitWorker(10).catch((err: Error) => err)
     ])
     result.map(err => expect(err).toHaveProperty('message', 'Worker thread exited before resolving'))
+    worker.pool.terminate()
   })
 
   it('rejects waiting method calls when all workers exited', async () => {
+    const worker:any  = await createThreadPool(basicWorkerPath, {
+      size: 2
+    })
+
     const [one, two, three, four] = await Promise.all([
       worker.exitWorker(10).catch((err: Error) => err),
       worker.exitWorker(10).catch((err: Error) => err),
@@ -277,9 +294,14 @@ describe('Error Handling', () => {
     expect(two).toHaveProperty('message', 'Worker thread exited before resolving')
     expect(three).toHaveProperty('message', 'All workers exited before resolving (use an error event handler or DEBUG=puddle:*)')
     expect(four).toHaveProperty('message', 'All workers exited before resolving (use an error event handler or DEBUG=puddle:*)')
+    worker.pool.terminate()
   })
 
   it('emits an error event when a worker errors', async () => {
+    const worker:any  = await createThreadPool(basicWorkerPath, {
+      size: 2
+    })
+
     const fn = jest.fn()
     worker.pool.on('error', fn)
 
@@ -289,6 +311,7 @@ describe('Error Handling', () => {
     expect(fn).toHaveBeenCalledTimes(1)
     expect(fn.mock.calls[0][0]).toHaveProperty('message', 'Worker failure')
     expect(fn.mock.calls[0][0]).toHaveProperty('stack', expect.stringContaining('workers/basic.js'))
+    worker.pool.terminate()
   })
 
   it.todo('forwards unhandledPromiseRejection to main event emitter')
