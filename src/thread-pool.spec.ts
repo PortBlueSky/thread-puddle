@@ -318,11 +318,27 @@ describe('Error Handling', () => {
     worker.pool.terminate()
   })
 
-  it.todo('forwards unhandledPromiseRejection to main event emitter')
-  
+  it('rejects open method calls when a worker throws unhandled rejection', async () => {
+    const worker:any  = await createThreadPool(basicWorkerPath, {
+      size: 2
+    })
+
+    const result = await Promise.all([
+      worker.waitForUnhandledRejection(10).catch((err: Error) => err),
+      worker.waitForUnhandledRejection(100).catch((err: Error) => err),
+      worker.waitForUnhandledRejection(100).catch((err: Error) => err),
+      worker.waitForUnhandledRejection(100).catch((err: Error) => err)
+    ])
+    const mapBy = countBy(result.map((err) => err.message))
+    
+    expect(Object.keys(mapBy)).toHaveLength(2)
+    expect(mapBy).toHaveProperty('Worker Promise failure', 2)
+    
+    worker.pool.terminate()
+  })
+
   it.todo('[Proposal] allows to manually respawn workers after error')
   it.todo('[Proposal] allows to manually respawn workers after exit')
-  it.todo('[Proposal] calling respawn only spawns a worker once again, ignores all other calls')
 })
 
 describe('ts-bridge', () => {
@@ -512,6 +528,7 @@ describe('Callbacks', () => {
     expect(callback).toHaveBeenCalledWith(30)
   })
 
+  it.todo('can transfer objects with callback')
   it.todo('handles callback errors/rejects')
 })
 
