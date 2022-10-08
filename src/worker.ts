@@ -12,6 +12,7 @@ import {
   ThreadMessageAction 
 } from './types/messages'
 import { FunctionId, ThreadMethodKey } from './types/general'
+import majorNodeVersion from './utils/major-node-version'
 
 const dynamicExports = require('./export-bridge')
 
@@ -152,6 +153,13 @@ parentPort.once('message', async (msg: InitMessage) => {
       }
     }
   })
+
+  // Note: Node < 16 does not exit and throw unhandled promise rejections
+  if (majorNodeVersion < 16) {
+    process.on('unhandledRejection', (reason, promise) => {
+      throw reason
+    });
+  }
 
   msg.port.postMessage({ action: 'ready' })
 })
