@@ -1,5 +1,5 @@
-const { withTransfer } = require('../../')
-const util = require('util')
+import { withTransfer } from '../../'
+import util from 'util'
 
 const uint8Array = new Uint8Array([1, 2, 3, 4])
 const uint16Array = new Uint16Array([1, 2, 3, 4])

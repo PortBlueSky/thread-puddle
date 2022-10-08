@@ -101,8 +101,8 @@ export async function createThreadPool<T> (workerPath: string, {
   // type WorkerType = unknown extends T
   //   ? typeof implicitWorkerType
   //   : T;
+  // -> See: https://github.com/microsoft/TypeScript/issues/31090
   type WorkerType = T
-
   
   type TargetWorkerType = BaseWorker & { all: FilterAndWrap<WorkerType> }
   type ExtendedWorkerType = TargetWorkerType & FilterAndWrap<WorkerType>

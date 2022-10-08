@@ -1,7 +1,7 @@
 import { createThreadPool, withTransfer } from './index'
 import majorVersion from './utils/major-node-version'
 
-const transferableWorkerPath = './__tests__/workers/transferable.js'
+const transferableWorkerPath = './__tests__/workers/transferable'
 
 describe('Transferable', () => {
   let worker: any

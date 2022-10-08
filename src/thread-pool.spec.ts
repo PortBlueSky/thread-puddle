@@ -13,8 +13,8 @@ import BasicWorker from './__tests__/workers/basic'
 debug.enabled('puddle')
 
 const basicWorkerPath = './__tests__/workers/basic'
-const startupFailWorkerPath = './__tests__/workers/startup-fail.js'
-const noObjectWorkerPath = './__tests__/workers/no-object.js'
+const startupFailWorkerPath = './__tests__/workers/startup-fail'
+const noObjectWorkerPath = './__tests__/workers/no-object'
 const invalidTsWorkerPath = './__tests__/workers/invalid-ts.ts'
 const validTsWorkerPath = './__tests__/workers/valid.ts'
 const classTsWorkerPath = './__tests__/workers/class.ts'

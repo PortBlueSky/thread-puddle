@@ -1,8 +1,8 @@
-import { FilterAndWrap } from "../.."
+import { WrapWorkerType } from "../.."
 import { createThreadPool } from '../../'
 import NestedWorker from './nested'
 
-let nestedWorker: FilterAndWrap<typeof NestedWorker> | null = null
+let nestedWorker: WrapWorkerType<typeof NestedWorker> | null = null
 
 export default {
   setup: async () => {

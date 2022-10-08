@@ -1,10 +1,11 @@
-import { createThreadPool } from './src'
+import { createThreadPool, WrapWorkerType } from './src'
+import BasicWorker from './src/__tests__/workers/basic'
 
 describe('Relative imports', () => {
-  let worker: any
+  let worker: WrapWorkerType<typeof BasicWorker>
 
   beforeEach(async () => {
-    worker = await createThreadPool<any>('./src/__tests__/workers/basic.js', {
+    worker = await createThreadPool<typeof BasicWorker>('./src/__tests__/workers/basic', {
       size: 2,
       workerOptions: {
         workerData: {
