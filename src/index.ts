@@ -57,6 +57,8 @@ type FilterType<Base, Condition> = Pick<Base, {
 type TypeWithMethods = Record<string | number | symbol,  (...a: any) => any | Promise<any>>
 export type AsyncMethod = (...param: any) => Promise<any>
 
+// TODO: 
+// Should reject sync callback methods in parameters
 type WrapReturnType<Base extends TypeWithMethods> = {
   [Key in keyof Base]: Base[Key] extends AsyncMethod
     ? Base[Key] 
@@ -119,6 +121,14 @@ export async function createThreadPool<WorkerType> (workerPath: string, {
   }
 
   const threadCallableStore = new CallableStore(debugOut)
+
+  threadCallableStore.on('callback:error', (err, id) => {
+    if (puddleInterface.listenerCount('callback:error') > 0) {
+      puddleInterface.emit('callback:error', err, id)
+      return
+    }
+    throw err
+  })
 
   const createThread = () => {
     debugOut('creating worker thread')
@@ -249,6 +259,11 @@ export async function createThreadPool<WorkerType> (workerPath: string, {
   })))
 
   debugOut('puddle filled, happy splashing!')
+
+  // TODO: Metrics
+  // Optionally gather metrics for method calls,
+  // to get a metrics object like:
+  // { function1: { roundTrip: { avg: 25, median: 23, max: 934 }, calls: 1564 } }
 
   Object.assign(puddleInterface, {
     terminate

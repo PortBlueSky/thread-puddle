@@ -528,8 +528,62 @@ describe('Callbacks', () => {
     expect(callback).toHaveBeenCalledWith(30)
   })
 
+  it('forwards callback errors to callback:error event', async () => {
+    const worker = await createThreadPool<WorkerWithCallback>('./__tests__/workers/callback')
+
+    const handler = jest.fn()
+    worker.pool.on('callback:error', handler)
+    const err = new Error('callback threw')
+    const fn = (val: number) => {
+      throw err
+    }
+    
+    await worker.withCallback(1, 2, fn)
+    
+    await new Promise<void>((resolve) => setTimeout(() => resolve(), 100))
+    worker.pool.terminate()
+
+    expect(handler).toHaveBeenCalledTimes(1)
+    expect(handler).toHaveBeenCalledWith(err, expect.any(Number))
+  })
+
+  it('forwards callback rejects to callback:error event', async () => {
+    const worker = await createThreadPool<WorkerWithCallback>('./__tests__/workers/callback')
+
+    const handler = jest.fn()
+    worker.pool.on('callback:error', handler)
+    const err = new Error('callback rejected')
+    const fn = async (val: number) => {
+      return new Promise((resolve, reject) => setTimeout(() => reject(err), 50))
+    }
+    
+    await worker.withCallback(1, 2, fn)
+    
+    await new Promise<void>((resolve) => setTimeout(() => resolve(), 100))
+    worker.pool.terminate()
+
+    expect(handler).toHaveBeenCalledTimes(1)
+    expect(handler).toHaveBeenCalledWith(err, expect.any(Number))
+  })
+
+  it.skip('throws if there is no callback:error listener', async () => {
+    const worker = await createThreadPool<WorkerWithCallback>('./__tests__/workers/callback')
+
+    const err = new Error('callback rejected')
+    const fn = async (val: number) => {
+      return new Promise((resolve, reject) => setTimeout(() => reject(err), 50))
+    }
+
+    // TODO: How to catch the broken promise chain here?
+        
+    await worker.withCallback(1, 2, fn)
+    
+    await new Promise<void>((resolve) => setTimeout(() => resolve(), 100))
+    worker.pool.terminate()
+  })
+
+  it.todo('does not handle callbacks when already terminated')
   it.todo('can transfer objects with callback')
-  it.todo('handles callback errors/rejects')
 })
 
 describe('Single Method Modules', () => {

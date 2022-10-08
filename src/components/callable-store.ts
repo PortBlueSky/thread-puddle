@@ -1,16 +1,17 @@
 import { Debugger } from "debug";
+import { EventEmitter } from "stream";
 import { MainFunctionMap } from "..";
 import { Transferable, TransferableValue } from "../Transferable";
 import { CallbackId, ThreadMethodKey } from "../types/general";
 import { BaseThreadMessage, CallMessage, isThreadCallbackMessage, isThreadErrorMessage, isThreadFreeFunctionMessage, isThreadFunctionMessage, MainMessageAction } from "../types/messages";
-import { CountSequence, createSequence } from "../utils/sequence";
+import { createSequence } from "../utils/sequence";
 
 export interface Callback {
   resolve(result: any): void
   reject(error: Error): void
 }
 
-export class CallableStore {
+export class CallableStore extends EventEmitter {
   private callables = new Map<CallbackId, Callback>()
   private callableSequence = createSequence()
   public mainFunctions = new Map<ThreadMethodKey, MainFunctionMap>()
@@ -18,7 +19,9 @@ export class CallableStore {
 
   constructor(
     private debug: Debugger
-  ) {}
+  ) {
+    super()
+  }
 
   rejectAll(withErr: Error) {
     for (const { reject } of this.callables.values()) {
@@ -38,6 +41,10 @@ export class CallableStore {
         return arg.obj
       }
 
+      // TODO:
+      // Consider forcing callbacks to have an error handler with something like:
+      // worker.method1(arg1, Callback(fn, (err) => handle(err)))
+
       if (typeof arg === 'function') {
         argFunctionPositions.push(index)
         if (!this.mainFunctions.has(key)) {
@@ -46,6 +53,8 @@ export class CallableStore {
         const fnHolder = this.mainFunctions.get(key)!
         
         const newId = this.functionSequence.next()
+        // TODO: use AsyncResource for correct stack trace
+        // ->  https://nodejs.org/api/async_context.html#class-asyncresource
         fnHolder.set(newId, arg)
 
         return { id: newId } 
@@ -90,7 +99,7 @@ export class CallableStore {
         // Note: the function has to be there,
         // if it fails, something is wrong with storing them or garbage collecting
         const mFn = fnHolder.get(msg.functionId)!
-        mFn(...msg.args)
+        Promise.resolve().then(() => mFn(...msg.args)).catch((err) => this.emit('callback:error', err, id))
       }
       return true
     } else if (isThreadFreeFunctionMessage(msg)) {
