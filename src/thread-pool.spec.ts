@@ -159,8 +159,70 @@ describe('Basic Features', () => {
   it.todo('warns if call queue becomes too large')
 })
 
+describe('Queue Size', () => {
+  it('fails calls when max queue size is reached', async () => {
+    const worker = await createThreadPool<typeof BasicWorker>('./__tests__/workers/basic', {
+      size: 1,
+      maxQueueSize: 1,
+    })
+    
+    const spy = jest.fn((err) => {
+      expect(err).toHaveProperty('message', 'Max thread queue size reached')
+    })
+
+    const waiters = Promise.all([
+      worker.asyncFn(1, 100),
+      worker.asyncFn(1, 100)
+    ]).catch(() => {/* ignore */})
+
+    try {
+      await worker.asyncFn(1, 100)
+    } catch (err) {
+      spy(err)
+    }
+
+    expect(spy).toHaveBeenCalledTimes(1)
+    worker.pool.terminate()
+  })
+
+  it('fails calls when max queue size is reached (worker.all)', async () => {
+    const worker = await createThreadPool<typeof BasicWorker>('./__tests__/workers/basic', {
+      size: 1,
+      maxQueueSize: 2,
+    })
+    
+    const spy = jest.fn((err) => {
+      expect(err).toHaveProperty('message', 'Max thread queue size reached')
+    })
+
+    const waiters = Promise.all([
+      worker.all.asyncFn(1, 100),
+      worker.all.asyncFn(1, 100)
+    ]).catch(() => {/* ignore */})
+
+    try {
+      await worker.asyncFn(1, 100)
+    } catch (err) {
+      spy(err)
+    }
+
+    try {
+      await worker.all.asyncFn(1, 100)
+    } catch (err) {
+      spy(err)
+    }
+
+    // Ensure can go on when clear again
+    await new Promise<void>((resolve) => setTimeout(() => resolve(), 125))
+    await worker.fn(1)
+
+    expect(spy).toHaveBeenCalledTimes(2)
+    worker.pool.terminate()
+  })
+})
+
 describe('Modules', () => {
-  it.only('handles a module without default export', async () => {
+  it('handles a module without default export', async () => {
     const worker = await createThreadPool<ValidWorkerModule>('./__tests__/workers/module', {
       size: 2
     })
