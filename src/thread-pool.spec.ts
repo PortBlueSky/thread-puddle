@@ -9,6 +9,7 @@ import { WorkerWithCallback } from './__tests__/workers/callback'
 import { WorkerWithEmitter } from './__tests__/workers/eventemitter'
 import { ChainWorkerClass } from './__tests__/workers/this'
 import BasicWorker from './__tests__/workers/basic'
+import { ValidWorkerModule } from './__tests__/workers/module'
 
 debug.enabled('puddle')
 
@@ -156,6 +157,18 @@ describe('Basic Features', () => {
   it.todo('allows to call methods on the parent thread')
   it.todo('can call a method on a specific worker directly')
   it.todo('warns if call queue becomes too large')
+})
+
+describe('Modules', () => {
+  it.only('handles a module without default export', async () => {
+    const worker = await createThreadPool<ValidWorkerModule>('./__tests__/workers/module', {
+      size: 2
+    })
+    const result = await worker.someMethod()
+
+    expect(result).toBe('hello module')
+    worker.pool.terminate()
+  })
 })
 
 if (majorVersion >= 13) {
