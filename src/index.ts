@@ -33,6 +33,7 @@ export type ThreadPoolOptions = {
   typecheck?: boolean
   workerOptions?: WorkerOptions
   startupTimeout?: number
+  maxQueueSize?: number
 }
 
 export interface BaseWorker {
@@ -59,6 +60,7 @@ export type AsyncMethod = (...param: any) => Promise<any>
 
 // TODO: 
 // Should reject sync callback methods in parameters
+// (or re-type them to async?)
 type WrapReturnType<Base extends TypeWithMethods> = {
   [Key in keyof Base]: Base[Key] extends AsyncMethod
     ? Base[Key] 
@@ -77,8 +79,14 @@ export async function createThreadPool<T> (workerPath: string, {
   size = 1,
   workerOptions = {},
   startupTimeout = 30000,
-  typecheck = false
+  typecheck = false,
+  maxQueueSize = 1000,
 }: ThreadPoolOptions = {}) {
+  // Validate Options
+  if (maxQueueSize < size) {
+    throw new Error('maxQueueSize needs to be at least the number of workers in the pool')
+  }
+
   debugOut('carving out a puddle...')
 
   // Resolve relative worker path
@@ -119,6 +127,9 @@ export async function createThreadPool<T> (workerPath: string, {
   const threads: WorkerThread[] = []
   const availableThreads: WorkerThread[] = []
   const threadRequests: ThreadRequest[] = []
+
+  // Holds the number of queued direct calls via worker.all
+  let directCallQueueSize = 0;
   
   let isTerminated = false
 
@@ -132,6 +143,7 @@ export async function createThreadPool<T> (workerPath: string, {
 
   const threadCallableStore = new CallableStore(debugOut)
 
+  // Forward callback errors to worker.pool interface
   threadCallableStore.on('callback:error', (err, id) => {
     if (puddleInterface.listenerCount('callback:error') > 0) {
       puddleInterface.emit('callback:error', err, id)
@@ -224,6 +236,10 @@ export async function createThreadPool<T> (workerPath: string, {
       return resolve(thread)
     }
 
+    if (threadRequests.length + directCallQueueSize >= maxQueueSize) {
+      return reject(new Error('Max thread queue size reached'))
+    }
+
     const threadRequest: ThreadRequest = { resolve, reject }
     threadRequests.push(threadRequest)
     debugOut('Added worker request')
@@ -300,9 +316,21 @@ export async function createThreadPool<T> (workerPath: string, {
         return undefined
       }
 
+      if (threadRequests.length + directCallQueueSize >= maxQueueSize) {
+        return () => Promise.reject(new Error('Max thread queue size reached'))
+      }
+
+      availableThreads.splice(0)
       return (...args: any[]) => Promise.all(
         threads.map(thread => new Promise((resolve, reject) => {
-          thread.callOnThread(key, args, resolve, reject)
+          directCallQueueSize += 1
+          thread.callOnThread(key, args, (value: any) => {
+            directCallQueueSize -= 1
+            resolve(value)
+          }, (err) => {
+            directCallQueueSize -= 1
+            reject(err)
+          })
         }))
       )
     }
