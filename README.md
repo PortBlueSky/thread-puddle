@@ -105,7 +105,7 @@ On the Proxy Object returned from `createThreadPool`, you can call any method wh
 `Arguments` are transferred to the worker thread via [`postMessage`](https://nodejs.org/dist/latest-v12.x/docs/api/worker_threads.html#worker_threads_port_postmessage_value_transferlist), compatible with the [HTML structured clone algorithm](https://developer.mozilla.org/en-US/docs/Web/API/Web_Workers_API/Structured_clone_algorithm). If you want to move arguments of type `ArrayBuffer` or `MessageChannel` instead of copying them, you can use the `withTransfer` helper.
 
 `Arguments` can contain a __`function`__ (__callback__) in the first level, which will be callable from the thread via a reference, but be executed on the main thread.
-__However__, the result of the callback is currently __not__ transfered back to the thread. It possible to implement a worker thread with an `EventEmitter` though, see the [eventemitter example](./examples/ts-eventemitter/). Callback errors will throw an `unhandled exception` if no error listener is attached to the pool `callback:error` event like `worker.pool.on('callback:error', () => ...)`.
+__However__, the result of the callback is currently __not__ transfered back to the thread. It is possible to implement a worker thread with an `EventEmitter` though, see the [eventemitter example](./examples/ts-eventemitter/). Callback errors will throw an `unhandled exception` if no error listener is attached to the pool `callback:error` event like `worker.pool.on('callback:error', () => ...)`.
 
 ```ts
 // examples/ts-callbacks/worker.ts

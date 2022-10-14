@@ -1,8 +1,8 @@
-const { workerData } = require('worker_threads')
-const { threadId } = require('../../')
+import { workerData } from 'worker_threads'
+import { threadId } from '../../'
 let currentlyHandling = false
 
-module.exports = {
+export default {
   fn: (arg1) => 'got ' + arg1,
   fnError: (arg1) => { throw new Error(arg1) },
   asyncFn: async (arg1, timeout = 10) => new Promise(resolve => setTimeout(() => resolve('got async ' + arg1), timeout)),
@@ -10,11 +10,15 @@ module.exports = {
   getWorkerData: () => workerData,
   triggerProcessError: () => {
     const err = new Error('Worker failure')
+    // @ts-ignore
     process.emit('error', err)
   },
   triggerUncaughtException: () => {
     setTimeout(() => {
       const err = new Error('Worker failure')
+      // @ts-ignore
+      // It's not in the types, but it behaves like an uncaught exception,
+      // as long as there is no error event listener 
       process.emit('error', err)
     }, 100)
   },
@@ -29,6 +33,7 @@ module.exports = {
   waitForUncaughtException: (timeout) => {
     return new Promise(resolve => setTimeout(() => {
       const err = new Error('Worker failure')
+      // @ts-ignore
       process.emit('error', err)
     }, timeout))
   },
@@ -37,7 +42,7 @@ module.exports = {
       throw new Error('Should not be called while another method call is handled')
     }
     currentlyHandling = true
-    return new Promise(resolve => setTimeout(() => {
+    return new Promise<void>(resolve => setTimeout(() => {
       currentlyHandling = false
       resolve()
     }, timeout))
