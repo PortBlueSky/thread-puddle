@@ -82,6 +82,11 @@ export async function createThreadPool<T> (workerPath: string, {
   typecheck = false,
   maxQueueSize = 1000,
 }: ThreadPoolOptions = {}) {
+  // Validate Options
+  if (maxQueueSize < size) {
+    throw new Error('maxQueueSize needs to be at least the number of workers in the pool')
+  }
+
   debugOut('carving out a puddle...')
 
   // Resolve relative worker path

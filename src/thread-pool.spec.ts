@@ -156,10 +156,25 @@ describe('Basic Features', () => {
   it.todo('throws module not found if path to worker cannot be resolved')
   it.todo('allows to call methods on the parent thread')
   it.todo('can call a method on a specific worker directly')
-  it.todo('warns if call queue becomes too large')
 })
 
 describe('Queue Size', () => {
+  it('throws if maxQueueSize less then the number of workers in the pool', async () => {
+    const spy = jest.fn((err) => {
+      expect(err).toHaveProperty('message', 'maxQueueSize needs to be at least the number of workers in the pool')
+    })
+
+    try {
+      await createThreadPool<typeof BasicWorker>('./__tests__/workers/basic', {
+        size: 1,
+        maxQueueSize: 0,
+      })
+    } catch(err) {
+      spy(err)
+    }
+    expect(spy).toHaveBeenCalledTimes(1)
+  })
+
   it('fails calls when max queue size is reached', async () => {
     const worker = await createThreadPool<typeof BasicWorker>('./__tests__/workers/basic', {
       size: 1,
