@@ -219,9 +219,9 @@ export async function createThreadPool<T> (workerPath: string, {
     }
 
     if (availableThreads.length > 0) {
-      const thread = availableThreads.shift()
+      const thread = availableThreads.shift()!
       debugOut('Resolving available worker %d', thread!.id)
-      return resolve(thread as WorkerThread)
+      return resolve(thread)
     }
 
     const threadRequest: ThreadRequest = { resolve, reject }
