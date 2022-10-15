@@ -93,6 +93,7 @@ Arguments:
   - `startupTimeout` - if a worker thread cannot be started within this timout in milliseconds, the pool creation will fail and reject with a timout error. Defaults to `30000`.
   - `typecheck` - In development `ts-node` is used, which by default runs `transpile-only` mode. To get type checks, set this to `true`.
   - `maxQueueSize` - When filled up with waiting calls, will reject all subsequent calls, until emptied to below max again. Defaults to `1000`
+  - `autoRefill` - Automatically fills up the pool with workers until `size` is reached when workers unexpectedly exit. Default `false`
 
 If the pool size is `> 1`, method calls will be forwarded to the next available worker. If all workers are busy, the method calls will be queued. A worker will handle one method call at any time only.
 
@@ -142,6 +143,10 @@ Will call the given `method` on all workers, as soon as they become available. R
 ### `worker.pool.terminate()`
 
 Terminates the pool and all worker threads in it. Trying to call methods in the pool afterwards, will result in an rejection.
+
+### `worker.pool.refill()`
+
+Fills up the pool with workers until `size` is reached. Can be used to manually decide wether to refill or terminate.
 
 ### `worker.pool.size`
 

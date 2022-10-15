@@ -34,6 +34,7 @@ export type ThreadPoolOptions = {
   workerOptions?: WorkerOptions
   startupTimeout?: number
   maxQueueSize?: number
+  autoRefill?: boolean
 }
 
 export interface BaseWorker {
@@ -44,6 +45,7 @@ export type MainFunctionMap = Map<number, Function>
 
 export interface PoolInterface extends EventEmitter {
   terminate(): void
+  refill(): void
   size: number
   isTerminated: boolean
   callbacks: ReadonlyMap<ThreadMethodKey, MainFunctionMap>
@@ -81,6 +83,7 @@ export async function createThreadPool<T> (workerPath: string, {
   startupTimeout = 30000,
   typecheck = false,
   maxQueueSize = 1000,
+  autoRefill = false
 }: ThreadPoolOptions = {}) {
   // Validate Options
   if (maxQueueSize < size) {
@@ -103,6 +106,18 @@ export async function createThreadPool<T> (workerPath: string, {
   }
 
   const { ext: resolvedWorkerExtension } = path.parse(require.resolve(resolvedWorkerPath))
+
+  const bridgeWorkerPath = path.resolve(__dirname, 'worker')
+  const { ext: bridgeWorkerExtension } = path.parse(require.resolve(bridgeWorkerPath))
+  let workerString = `require('${bridgeWorkerPath}')`
+
+  if (hasTSNode() && [bridgeWorkerExtension, resolvedWorkerExtension].includes('.ts')) {
+    if (typecheck) {
+      workerString = `require('ts-node').register()\n${workerString}`
+    } else {
+      workerString = `require('ts-node/register/transpile-only')\n${workerString}`
+    }
+  }
   
   // TODO: Automatically infer types from worker path if not given
   // const implicitWorkerType = await import('./__tests__/workers/basic');
@@ -152,22 +167,19 @@ export async function createThreadPool<T> (workerPath: string, {
     throw err
   })
 
+  const refill = () => {
+    const diff = size - threads.length
+
+    for (let i = 0; i < diff; i++) {
+      createThread()
+    }
+  }
+
   const createThread = () => {
     debugOut('creating worker thread')
 
-    const bridgeWorkerPath = path.resolve(__dirname, 'worker')
-    const { ext: bridgeWorkerExtension } = path.parse(require.resolve(bridgeWorkerPath))
-    let workerString = `require('${bridgeWorkerPath}')`
-
-    if (hasTSNode() && [bridgeWorkerExtension, resolvedWorkerExtension].includes('.ts')) {
-      if (typecheck) {
-        workerString = `require('ts-node').register()\n${workerString}`
-      } else {
-        workerString = `require('ts-node/register/transpile-only')\n${workerString}`
-      }
-    }
-
     const thread = new WorkerThread(workerThreadIdSequence.next(), threadId, debugOut, workerString, resolvedWorkerPath, workerOptions, threadCallableStore)
+    threads.push(thread)
 
     debugOut('creates worker thread %s', thread.id)
 
@@ -193,10 +205,12 @@ export async function createThreadPool<T> (workerPath: string, {
     })
 
     thread.on('exit', (code, id) => {
+      removeThread(thread)
       puddleInterface.emit('exit', code, id)
 
-      // TODO: Ensure thread is not removed after being created from error
-      removeThread(thread)
+      if (!isTerminated && autoRefill) {
+        refill()
+      }
       
       if (threads.length === 0) {
         terminate()
@@ -211,19 +225,14 @@ export async function createThreadPool<T> (workerPath: string, {
     thread.on('error', (err, id) => {
       if (puddleInterface.listenerCount('error') > 0) {
         puddleInterface.emit('error', err, id)
+      } else {
+        terminate()
       }
-
-      terminate()
     })
-
-    threads.push(thread)
   }
 
   debugOut('filling puddle with thread liquid...')
-
-  for (let i = 0; i < size; i += 1) {
-    createThread()
-  }
+  refill()
 
   const getAvailableThread = () => new Promise<WorkerThread>((resolve, reject) => {
     if (isTerminated) {
@@ -292,7 +301,8 @@ export async function createThreadPool<T> (workerPath: string, {
   // { function1: { roundTrip: { avg: 25, median: 23, max: 934 }, calls: 1564 } }
 
   Object.assign(puddleInterface, {
-    terminate
+    terminate,
+    refill
   })
   Object.defineProperties(puddleInterface, {
     size: {

@@ -5,9 +5,12 @@ import path from 'path'
 
 const ITERATIONS = 100000
 
+/**
+ * Checking the pure roundtrip overhead
+ */
 async function start () {
   // Puddle
-  const worker = await createThreadPool<CalcWorker>('./puddle-worker')
+  const worker = await createThreadPool<CalcWorker>('./puddle-worker', { size: 2 })
   const puddleStart = Date.now()
   
   for (let i = 0; i < ITERATIONS; i++) {

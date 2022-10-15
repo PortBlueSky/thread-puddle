@@ -11,6 +11,9 @@
   - Max Queue Size #29
     - Subsequent calls will be rejected when max queue size is reached,
     until the queue is emptied below max again.
+  - Refill
+    - can auto refill the pool when workers unexpectedly exit
+    - can manually refill the pool whenever
 
 ## Version 0.3.2
   - Stricter and fixed types #16
