@@ -9,6 +9,7 @@ import { createSequence } from "../utils/sequence";
 export interface Callback {
   resolve(result: any): void
   reject(error: Error): void
+  done?: (success: boolean) => void
 }
 
 export class CallableStore extends EventEmitter {
@@ -77,19 +78,21 @@ export class CallableStore extends EventEmitter {
     if (isThreadCallbackMessage(msg)) {
       this.debug('Callable id %d resolved callback %d', id, msg.callbackId)
       
-      const callback = this.callables.get(msg.callbackId)
+      const callback = this.callables.get(msg.callbackId)!
       this.callables.delete(msg.callbackId)
-      callback!.resolve(msg.result)
+      callback.resolve(msg.result)
+      callback.done && callback.done(true)
       return true
     } else if (isThreadErrorMessage(msg)) {
       this.debug('Callable id %d rejected callback %d', id, msg.callbackId)
       
-      const callback = this.callables.get(msg.callbackId)
+      const callback = this.callables.get(msg.callbackId)!
       this.callables.delete(msg.callbackId)
       // TODO: Resolve to correct error class
       const err = new Error(msg.message)
       err.stack = msg.stack
-      callback!.reject(err)
+      callback.reject(err)
+      callback.done && callback.done(false)
       return true
     } else if (isThreadFunctionMessage(msg)) {
       this.debug('worker %d calling function %s[%d]', id, msg.key, msg.functionId)
