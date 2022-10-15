@@ -10,6 +10,7 @@ import { ThreadMethodKey } from './types/general'
 import { createSequence } from './utils/sequence'
 import { CallableStore } from './components/callable-store'
 import { WorkerThread } from './WorkerThread'
+import { RequestQueue } from './components/request-queue'
 
 const { threadId: dynamicThreadId, debug: dynamicDebug } = require('./export-bridge')
 export const threadId = dynamicThreadId
@@ -46,6 +47,7 @@ export type MainFunctionMap = Map<number, Function>
 export interface PoolInterface extends EventEmitter {
   terminate(): void
   refill(): void
+  drain(shouldTerminate?: boolean): Promise<void>
   size: number
   isTerminated: boolean
   callbacks: ReadonlyMap<ThreadMethodKey, MainFunctionMap>
@@ -141,7 +143,7 @@ export async function createThreadPool<T> (workerPath: string, {
 
   const threads: WorkerThread[] = []
   const availableThreads: WorkerThread[] = []
-  const threadRequests: ThreadRequest[] = []
+  const threadRequests = new RequestQueue()
 
   // Holds the number of queued direct calls via worker.all
   let directCallQueueSize = 0;
@@ -167,6 +169,30 @@ export async function createThreadPool<T> (workerPath: string, {
     throw err
   })
 
+  const drain = async (shouldTerminate: boolean = true) => {
+    const waiters = []
+
+    if (threadRequests.size() > 0) {
+      waiters.push(new Promise((resolve) => threadRequests.once('empty', resolve)))
+    }
+
+    threads.forEach((thread) => {
+      if (thread.callQueue.length > 0) {
+        waiters.push(new Promise((resolve) => thread.once('ready', resolve)))
+      }
+    })
+
+    if (threadRequests.size() > 0 || threadCallableStore.size() > 0) {
+      waiters.push(new Promise((resolve) => threadCallableStore.once('empty', resolve)))
+    }
+
+    await Promise.all(waiters)
+    
+    if (shouldTerminate) {
+      terminate()
+    }
+  }
+
   const refill = () => {
     const diff = size - threads.length
 
@@ -184,8 +210,8 @@ export async function createThreadPool<T> (workerPath: string, {
     debugOut('creates worker thread %s', thread.id)
 
     thread.on('ready', () => {
-      if (threadRequests.length > 0) {
-        const request = threadRequests.shift()
+      if (threadRequests.hasPending()) {
+        const request = threadRequests.next()
         request!.resolve(thread)
         return
       }
@@ -198,8 +224,10 @@ export async function createThreadPool<T> (workerPath: string, {
     })
 
     thread.on('startup-error', (err) => {
-      if (threadRequests.length > 0) {
-        const request = threadRequests.shift()
+      // TODO: There might be more than one request
+      // -> startup error should be handled elsewhere
+      if (threadRequests.hasPending()) {
+        const request = threadRequests.next()
         request!.reject(err)
       }
     })
@@ -216,9 +244,7 @@ export async function createThreadPool<T> (workerPath: string, {
         terminate()
 
         const err = new Error('All workers exited before resolving (use an error event handler or DEBUG=puddle:*)')
-        for (const workerRequest of threadRequests) {
-          workerRequest.reject(err)
-        }
+        threadRequests.rejectAll(err)
       }
     })
 
@@ -245,7 +271,7 @@ export async function createThreadPool<T> (workerPath: string, {
       return resolve(thread)
     }
 
-    if (threadRequests.length + directCallQueueSize >= maxQueueSize) {
+    if (threadRequests.size() + directCallQueueSize >= maxQueueSize) {
       return reject(new Error('Max thread queue size reached'))
     }
 
@@ -302,7 +328,8 @@ export async function createThreadPool<T> (workerPath: string, {
 
   Object.assign(puddleInterface, {
     terminate,
-    refill
+    refill,
+    drain
   })
   Object.defineProperties(puddleInterface, {
     size: {
@@ -326,7 +353,7 @@ export async function createThreadPool<T> (workerPath: string, {
         return undefined
       }
 
-      if (threadRequests.length + directCallQueueSize >= maxQueueSize) {
+      if (threadRequests.size() + directCallQueueSize >= maxQueueSize) {
         return () => Promise.reject(new Error('Max thread queue size reached'))
       }
 

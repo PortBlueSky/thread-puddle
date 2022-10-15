@@ -191,6 +191,30 @@ describe('Refill', () => {
   })
 })
 
+describe('Drain', () => {
+  it('gracefully waits until all open calls resolve, then shuts down the threads', async () => {
+    const worker = await createThreadPool<typeof BasicWorker>('./__tests__/workers/basic', {
+      size: 2,
+    })
+
+    const waitingCalls = Promise.all([
+      worker.asyncFn(1, 50),
+      worker.asyncFn(2, 10),
+      worker.asyncFn(3, 80),
+      worker.asyncFn(4, 40),
+    ])
+
+    await worker.pool.drain()
+    await new Promise<void>((resolve) => setTimeout(() => resolve(), 125))
+
+    const results = await waitingCalls
+
+    expect(results).toEqual(['got async 1', 'got async 2', 'got async 3', 'got async 4'])
+    expect(worker.pool.size).toEqual(0)
+    expect(worker.pool.isTerminated).toEqual(true)
+  })
+})
+
 describe('Queue Size', () => {
   it('throws if maxQueueSize less then the number of workers in the pool', async () => {
     const spy = jest.fn((err) => {
@@ -707,6 +731,7 @@ describe('Callbacks', () => {
     worker.pool.terminate()
   })
 
+  it.todo('frees main functions when threads holding references exit')
   it.todo('does not handle callbacks when already terminated')
   it.todo('can transfer objects with callback')
 })

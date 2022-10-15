@@ -24,6 +24,10 @@ export class CallableStore extends EventEmitter {
     super()
   }
 
+  size() {
+    return this.callables.size
+  }
+
   rejectAll(withErr: Error) {
     for (const { reject } of this.callables.values()) {
       reject(withErr)
@@ -74,12 +78,20 @@ export class CallableStore extends EventEmitter {
     return { msg, transferables }
   }
 
+  private remove(callbackId: number) {
+    this.callables.delete(callbackId)
+
+    if (this.callables.size === 0) {
+      this.emit('empty')
+    }
+  }
+
   handleMessage(msg: BaseThreadMessage, id: number): boolean {
     if (isThreadCallbackMessage(msg)) {
       this.debug('Callable id %d resolved callback %d', id, msg.callbackId)
       
       const callback = this.callables.get(msg.callbackId)!
-      this.callables.delete(msg.callbackId)
+      this.remove(msg.callbackId)
       callback.resolve(msg.result)
       callback.done && callback.done(true)
       return true
@@ -87,7 +99,7 @@ export class CallableStore extends EventEmitter {
       this.debug('Callable id %d rejected callback %d', id, msg.callbackId)
       
       const callback = this.callables.get(msg.callbackId)!
-      this.callables.delete(msg.callbackId)
+      this.remove(msg.callbackId)
       // TODO: Resolve to correct error class
       const err = new Error(msg.message)
       err.stack = msg.stack

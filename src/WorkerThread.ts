@@ -18,7 +18,7 @@ export class WorkerThread extends EventEmitter {
   private worker: Worker
   public readonly port: MessagePort
   public error: Error | boolean = false
-  private callQueue: QueuedCall[] = []
+  public callQueue: QueuedCall[] = []
   private busy: boolean = true
   private isTerminated: boolean = false
 
