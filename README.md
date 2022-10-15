@@ -6,7 +6,7 @@
 
 ## Turn any module into a worker thread
 
-[![Build Status](https://travis-ci.com/PortBlueSky/thread-puddle.svg?branch=master)](https://travis-ci.com/PortBlueSky/thread-puddle) [![npm version](https://badge.fury.io/js/thread-puddle.svg)](https://badge.fury.io/js/thread-puddle) [![Coverage Status](https://coveralls.io/repos/github/PortBlueSky/thread-puddle/badge.svg?branch=master)](https://coveralls.io/github/PortBlueSky/thread-puddle?branch=master)
+[![Master Push](https://github.com/PortBlueSky/thread-puddle/actions/workflows/master-push.yml/badge.svg)](https://github.com/PortBlueSky/thread-puddle/actions/workflows/master-push.yml) [![npm version](https://badge.fury.io/js/thread-puddle.svg)](https://badge.fury.io/js/thread-puddle) [![Coverage Status](https://coveralls.io/repos/github/PortBlueSky/thread-puddle/badge.svg?branch=master)](https://coveralls.io/github/PortBlueSky/thread-puddle?branch=master)
 
 A library to pool Node.js [worker threads](https://nodejs.org/dist/latest-v13.x/docs/api/worker_threads.html), automatically exposing exported module methods using [Proxy Objects](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Proxy) for easy bi-directional communication between main and worker thread.
 
