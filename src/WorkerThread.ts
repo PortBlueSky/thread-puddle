@@ -3,7 +3,7 @@ import { EventEmitter } from "stream"
 import { MessageChannel, MessagePort, Worker, WorkerOptions } from "worker_threads"
 import { CallableStore } from "./components/callable-store"
 import { ThreadId, ThreadMethodKey } from "./types/general"
-import { BaseThreadMessage, InitMessage, isThreadCallbackMessage, isThreadErrorMessage, isThreadReadyMessage, isThreadStartupErrorMessage, MainMessageAction, ThreadErrorMessage } from "./types/messages"
+import { BaseThreadMessage, InitMessage, isThreadReadyMessage, isThreadStartupErrorMessage, MainMessageAction, ThreadErrorMessage } from "./types/messages"
 
 export interface QueuedCall {
   key: ThreadMethodKey
