@@ -12,8 +12,10 @@
     - Subsequent calls will be rejected when max queue size is reached,
     until the queue is emptied below max again.
   - Refill
-    - can auto refill the pool when workers unexpectedly exit
-    - can manually refill the pool whenever
+    - automatically refill pool when workers exit via `autoRefill: true` pool option
+    - manually refill pool whenever via `worker.pool.refill()`
+  - Drain (graceful shutdown)
+    - Wait until all calls are done and workers are idle, then terminate, via `worker.pool.drain()`
 
 ## Version 0.3.2
   - Stricter and fixed types #16
