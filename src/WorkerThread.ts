@@ -21,6 +21,7 @@ export class WorkerThread extends EventEmitter {
   public callQueue: QueuedCall[] = []
   private busy: boolean = true
   private isTerminated: boolean = false
+  public callableStore: CallableStore
 
   constructor(
     id: ThreadId,
@@ -29,11 +30,15 @@ export class WorkerThread extends EventEmitter {
     workerString: string, 
     resolvedWorkerPath: string, 
     workerOptions: WorkerOptions, 
-    private callableStore: CallableStore
   ) {
     super()
 
     this.id = id
+    this.callableStore = new CallableStore(debug)
+
+    this.callableStore.on('callback:error', (err, id) => {
+      this.emit('callback:error', err, id)
+    })
 
     const worker = new Worker(workerString, { ...workerOptions, eval: true })
     this.worker = worker
@@ -52,7 +57,8 @@ export class WorkerThread extends EventEmitter {
 
       if (!this.error) {
         const err = new Error('Worker thread exited before resolving')
-        callableStore.rejectAll(err)
+        this.callableStore.rejectAll(err)
+        this.callableStore.callbacks.clear()
       }
 
       this.emit('exit', code, id)
@@ -62,7 +68,7 @@ export class WorkerThread extends EventEmitter {
       this.debug(`worker ${id} Error: %s`, err.message)
 
       if (!this.isTerminated) {
-        callableStore.rejectAll(err)
+        this.callableStore.rejectAll(err)
         
         this.error = err
       }
@@ -80,7 +86,7 @@ export class WorkerThread extends EventEmitter {
     const messageHandler = (msg: BaseThreadMessage) => {
       this.emit('message', msg, id)
 
-      const handled = callableStore.handleMessage(msg, id)
+      const handled = this.callableStore.handleMessage(msg, id)
 
       if (!handled) {
         throw new Error(`Unknown worker pool action "${(msg as BaseThreadMessage).action}"`)
@@ -127,7 +133,7 @@ export class WorkerThread extends EventEmitter {
       return
     }
 
-    this.emit('ready')
+    this.emit('ready', this.id)
   }
 
   callOnThread(

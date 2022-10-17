@@ -1,5 +1,5 @@
 import { MessagePort } from "worker_threads"
-import { CallbackId, ThreadId, ThreadMethodKey } from "./general"
+import { CallableId, ThreadId, ThreadMethodKey } from "./general"
 
 // Sent by main
 export enum MainMessageAction {
@@ -13,7 +13,7 @@ export type BaseMainMessage = {
 
 export type CallMessage = BaseMainMessage & {
   key: ThreadMethodKey
-  callbackId: number
+  callableId: number
   args: any
   argFunctionPositions: number[]
 }
@@ -42,23 +42,23 @@ export type BaseThreadMessage = {
 export type ThreadReadyMessage = BaseThreadMessage
 
 export type ThreadCallbackMessage = BaseThreadMessage & {
-  callbackId: CallbackId
+  callableId: CallableId
   result: any
 }
 
 export type ThreadFunctionMessage = BaseThreadMessage & {
-  functionId: CallbackId
+  functionId: CallableId
   key: ThreadMethodKey
   args: any[]
 }
 
 export type ThreadFreeFunctionMessage = BaseThreadMessage & {
-  functionId: CallbackId
+  functionId: CallableId
   key: ThreadMethodKey
 }
 
 export type ThreadErrorMessage = BaseThreadMessage & {
-  callbackId: CallbackId
+  callableId: CallableId
   message: string
   stack: string
 }

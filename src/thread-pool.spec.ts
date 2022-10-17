@@ -10,6 +10,7 @@ import { WorkerWithEmitter } from './__tests__/workers/eventemitter'
 import { ChainWorkerClass } from './__tests__/workers/this'
 import BasicWorker from './__tests__/workers/basic'
 import { ValidWorkerModule } from './__tests__/workers/module'
+import { WorkerThread } from './WorkerThread'
 
 debug.enabled('puddle')
 
@@ -411,9 +412,13 @@ describe('Error Handling', () => {
       worker.waitForUncaughtException(100).catch((err: Error) => err)
     ])
     const mapBy = countBy(result.map((err) => err.message))
-    
-    expect(Object.keys(mapBy)).toHaveLength(2)
-    expect(mapBy).toHaveProperty('Worker failure', 2)
+
+    expect(Object.keys(mapBy)).toHaveLength(3)
+    expect(mapBy).toEqual({
+      'Worker failure': 1,
+      'Worker thread exited before resolving': 1,
+      'All workers exited before resolving (use an error event handler or DEBUG=puddle:*)': 2
+    })
     
     worker.pool.terminate()
   })
@@ -479,15 +484,16 @@ describe('Error Handling', () => {
       worker.waitForUnhandledRejection(100).catch((err: Error) => err)
     ])
     const mapBy = countBy(result.map((err) => err.message))
-    
-    expect(Object.keys(mapBy)).toHaveLength(2)
-    expect(mapBy).toHaveProperty('Worker Promise failure', 2)
+
+    expect(Object.keys(mapBy)).toHaveLength(3)
+    expect(mapBy).toEqual({
+      'Worker Promise failure': 1,
+      'Worker thread exited before resolving': 1,
+      'All workers exited before resolving (use an error event handler or DEBUG=puddle:*)': 2
+    })
     
     worker.pool.terminate()
   })
-
-  it.todo('[Proposal] allows to manually respawn workers after error')
-  it.todo('[Proposal] allows to manually respawn workers after exit')
 })
 
 describe('ts-bridge', () => {
@@ -731,8 +737,28 @@ describe('Callbacks', () => {
     worker.pool.terminate()
   })
 
-  it.todo('frees main functions when threads holding references exit')
-  it.todo('does not handle callbacks when already terminated')
+  it('frees main functions when threads holding references exit', async () => {
+    const worker = await createThreadPool<WorkerWithCallback>('./__tests__/workers/callback')
+
+    const fn = () => {}
+    worker.withCallback(10, 20, fn)
+
+    await new Promise<void>((resolve) => setTimeout(() => resolve(), 100))
+
+    const thread: WorkerThread = worker.pool.threads.values().next().value
+    let numberOfStoredMethods = thread.callableStore.callbacks.get('withCallback')?.size
+    expect(numberOfStoredMethods).toEqual(1)
+
+    worker.triggerExit()
+
+    await new Promise<void>((resolve) => setTimeout(() => resolve(), 100))
+    
+    const callbacks = thread.callableStore.callbacks.get('withCallback')
+    expect(callbacks).toEqual(undefined)
+
+    worker.pool.terminate()
+  })
+
   it.todo('can transfer objects with callback')
 })
 

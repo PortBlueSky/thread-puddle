@@ -4,6 +4,7 @@ import { createThreadPool } from './index'
 import debug from 'debug'
 import { WorkerWithCallback } from './__tests__/workers/callback'
 import { isThreadFreeFunctionMessage, ThreadMessageAction } from './types/messages'
+import { WorkerThread } from './WorkerThread'
 
 debug.enabled('puddle')
 
@@ -40,7 +41,9 @@ describe('Garbage Collections', () => {
       functionId: expect.any(Number),
       key: expect.any(String)
     })
-    const numberOfStoredMethods = worker.pool.callbacks.get('withCallback')?.size
+
+    const thread: WorkerThread = worker.pool.threads.values().next().value
+    const numberOfStoredMethods = thread.callableStore.callbacks.get('withCallback')?.size
     expect(numberOfStoredMethods).toBeLessThan(callTimes / 2)
   }, 30000)
 })

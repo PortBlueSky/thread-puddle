@@ -6,9 +6,8 @@ import getCallsites from './utils/callsites'
 export { withTransfer } from './Transferable'
 import { isMainThread, WorkerOptions } from 'worker_threads'
 import hasTSNode from './utils/has-ts-node'
-import { ThreadMethodKey } from './types/general'
+import { ThreadId } from './types/general'
 import { createSequence } from './utils/sequence'
-import { CallableStore } from './components/callable-store'
 import { WorkerThread } from './WorkerThread'
 import { RequestQueue } from './components/request-queue'
 
@@ -42,15 +41,13 @@ export interface BaseWorker {
   pool: PoolInterface
 }
 
-export type MainFunctionMap = Map<number, Function>
-
 export interface PoolInterface extends EventEmitter {
   terminate(): void
   refill(): void
   drain(shouldTerminate?: boolean): Promise<void>
   size: number
   isTerminated: boolean
-  callbacks: ReadonlyMap<ThreadMethodKey, MainFunctionMap>
+  threads: ReadonlyMap<ThreadId, WorkerThread>
 }
 
 type ProxyWorkerTarget = Record<string, any>
@@ -141,7 +138,7 @@ export async function createThreadPool<T> (workerPath: string, {
     new <T, H extends object, K extends WorkerType>(target: T, handler: ProxyHandler<H>): K
   }
 
-  const threads: WorkerThread[] = []
+  const threads = new Map<ThreadId, WorkerThread>()
   const availableThreads: WorkerThread[] = []
   const threadRequests = new RequestQueue()
 
@@ -154,39 +151,18 @@ export async function createThreadPool<T> (workerPath: string, {
   const puddleInterface = new EventEmitter()
 
   const removeThread = ({ id }: WorkerThread) => {
-    threads.splice(threads.findIndex(thread => (thread.id === id)), 1)
+    threads.delete(id)
     availableThreads.splice(availableThreads.findIndex(thread => (thread.id === id)), 1)
   }
 
-  const threadCallableStore = new CallableStore(debugOut)
-
-  // Forward callback errors to worker.pool interface
-  threadCallableStore.on('callback:error', (err, id) => {
-    if (puddleInterface.listenerCount('callback:error') > 0) {
-      puddleInterface.emit('callback:error', err, id)
-      return
-    }
-    throw err
-  })
-
   const drain = async (shouldTerminate: boolean = true) => {
-    const waiters = []
-
-    if (threadRequests.size() > 0) {
-      waiters.push(new Promise((resolve) => threadRequests.once('empty', resolve)))
+    if (threadRequests.size() > 0 || Array.from(threads.values()).some((thread) => thread.callQueue.length > 0)) {
+      await new Promise<void>((resolve) => puddleInterface.on('ready', () => {
+        if (threads.size === availableThreads.length) {
+          resolve()
+        }
+      }))
     }
-
-    threads.forEach((thread) => {
-      if (thread.callQueue.length > 0) {
-        waiters.push(new Promise((resolve) => thread.once('ready', resolve)))
-      }
-    })
-
-    if (threadRequests.size() > 0 || threadCallableStore.size() > 0) {
-      waiters.push(new Promise((resolve) => threadCallableStore.once('empty', resolve)))
-    }
-
-    await Promise.all(waiters)
     
     if (shouldTerminate) {
       terminate()
@@ -194,7 +170,7 @@ export async function createThreadPool<T> (workerPath: string, {
   }
 
   const refill = () => {
-    const diff = size - threads.length
+    const diff = size - threads.size
 
     for (let i = 0; i < diff; i++) {
       createThread()
@@ -204,23 +180,34 @@ export async function createThreadPool<T> (workerPath: string, {
   const createThread = () => {
     debugOut('creating worker thread')
 
-    const thread = new WorkerThread(workerThreadIdSequence.next(), threadId, debugOut, workerString, resolvedWorkerPath, workerOptions, threadCallableStore)
-    threads.push(thread)
+    const thread = new WorkerThread(workerThreadIdSequence.next(), threadId, debugOut, workerString, resolvedWorkerPath, workerOptions)
+    threads.set(thread.id, thread)
 
     debugOut('creates worker thread %s', thread.id)
 
-    thread.on('ready', () => {
+    thread.on('ready', (id) => {
       if (threadRequests.hasPending()) {
         const request = threadRequests.next()
         request!.resolve(thread)
         return
       }
-  
+      
       availableThreads.push(thread)
+      
+      puddleInterface.emit('ready', id)
     })
 
     thread.on('message', (msg, id) => {
       puddleInterface.emit('thread:message', msg, id)
+    })
+
+    // Forward callback errors to worker.pool interface
+    thread.on('callback:error', (err, id) => {
+      if (puddleInterface.listenerCount('callback:error') > 0) {
+        puddleInterface.emit('callback:error', err, id)
+        return
+      }
+      throw err
     })
 
     thread.on('startup-error', (err) => {
@@ -240,7 +227,7 @@ export async function createThreadPool<T> (workerPath: string, {
         refill()
       }
       
-      if (threads.length === 0) {
+      if (threads.size === 0) {
         terminate()
 
         const err = new Error('All workers exited before resolving (use an error event handler or DEBUG=puddle:*)')
@@ -289,12 +276,12 @@ export async function createThreadPool<T> (workerPath: string, {
     
     isTerminated = true
     
-    for (const thread of threads) {
+    threads.forEach((thread) => {
       thread.terminate()
-    }
+    })
   }
 
-  await Promise.all(threads.map((thread) => new Promise<void>((resolve, reject) => {
+  await Promise.all(Array.from(threads.values()).map((thread) => new Promise<void>((resolve, reject) => {
     const timeout = setTimeout(() => {
       terminate()
       reject(new Error(`Worker ${thread.id} initialization timed out`))
@@ -333,13 +320,13 @@ export async function createThreadPool<T> (workerPath: string, {
   })
   Object.defineProperties(puddleInterface, {
     size: {
-      get: () => threads.length
+      get: () => threads.size
     },
     isTerminated: {
       get: () => isTerminated
     },
-    callbacks: {
-      get: () => threadCallableStore.mainFunctions
+    threads: {
+      get: () => threads
     }
   })
 
@@ -359,7 +346,7 @@ export async function createThreadPool<T> (workerPath: string, {
 
       availableThreads.splice(0)
       return (...args: any[]) => Promise.all(
-        threads.map(thread => new Promise((resolve, reject) => {
+        Array.from(threads.values()).map(thread => new Promise((resolve, reject) => {
           directCallQueueSize += 1
           thread.callOnThread(key, args, (value: any) => {
             directCallQueueSize -= 1

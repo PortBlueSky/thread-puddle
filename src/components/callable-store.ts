@@ -1,21 +1,22 @@
 import { Debugger } from "debug";
 import { EventEmitter } from "stream";
-import { MainFunctionMap } from "..";
 import { Transferable, TransferableValue } from "../Transferable";
-import { CallbackId, ThreadMethodKey } from "../types/general";
+import { CallableId, ThreadMethodKey } from "../types/general";
 import { BaseThreadMessage, CallMessage, isThreadCallbackMessage, isThreadErrorMessage, isThreadFreeFunctionMessage, isThreadFunctionMessage, MainMessageAction } from "../types/messages";
 import { createSequence } from "../utils/sequence";
 
-export interface Callback {
+export interface Callable {
   resolve(result: any): void
   reject(error: Error): void
   done?: (success: boolean) => void
 }
 
+export type MainFunctionMap = Map<number, Function>
+
 export class CallableStore extends EventEmitter {
-  private callables = new Map<CallbackId, Callback>()
+  private callables = new Map<CallableId, Callable>()
   private callableSequence = createSequence()
-  public mainFunctions = new Map<ThreadMethodKey, MainFunctionMap>()
+  public callbacks = new Map<ThreadMethodKey, MainFunctionMap>()
   private functionSequence = createSequence()
 
   constructor(
@@ -34,7 +35,7 @@ export class CallableStore extends EventEmitter {
     }
   }
 
-  createCallMessage(key: ThreadMethodKey, args: any[], callable: Callback): { msg: CallMessage, transferables: Transferable[] } {
+  createCallMessage(key: ThreadMethodKey, args: any[], callable: Callable): { msg: CallMessage, transferables: Transferable[] } {
     const callableId = this.callableSequence.next()
     this.callables.set(callableId, callable)
 
@@ -52,10 +53,10 @@ export class CallableStore extends EventEmitter {
 
       if (typeof arg === 'function') {
         argFunctionPositions.push(index)
-        if (!this.mainFunctions.has(key)) {
-          this.mainFunctions.set(key, new Map<number, Function>)
+        if (!this.callbacks.has(key)) {
+          this.callbacks.set(key, new Map<number, Function>)
         }
-        const fnHolder = this.mainFunctions.get(key)!
+        const fnHolder = this.callbacks.get(key)!
         
         const newId = this.functionSequence.next()
         // TODO: use AsyncResource for correct stack trace
@@ -70,7 +71,7 @@ export class CallableStore extends EventEmitter {
     const msg: CallMessage = {
       action: MainMessageAction.CALL,
       key,
-      callbackId: callableId,
+      callableId,
       args: iteratedArgs,
       argFunctionPositions
     }
@@ -78,8 +79,8 @@ export class CallableStore extends EventEmitter {
     return { msg, transferables }
   }
 
-  private remove(callbackId: number) {
-    this.callables.delete(callbackId)
+  private remove(callableId: number) {
+    this.callables.delete(callableId)
 
     if (this.callables.size === 0) {
       this.emit('empty')
@@ -88,18 +89,18 @@ export class CallableStore extends EventEmitter {
 
   handleMessage(msg: BaseThreadMessage, id: number): boolean {
     if (isThreadCallbackMessage(msg)) {
-      this.debug('Callable id %d resolved callback %d', id, msg.callbackId)
+      this.debug('Callable id %d resolved callback %d', id, msg.callableId)
       
-      const callback = this.callables.get(msg.callbackId)!
-      this.remove(msg.callbackId)
+      const callback = this.callables.get(msg.callableId)!
+      this.remove(msg.callableId)
       callback.resolve(msg.result)
       callback.done && callback.done(true)
       return true
     } else if (isThreadErrorMessage(msg)) {
-      this.debug('Callable id %d rejected callback %d', id, msg.callbackId)
+      this.debug('Callable id %d rejected callback %d', id, msg.callableId)
       
-      const callback = this.callables.get(msg.callbackId)!
-      this.remove(msg.callbackId)
+      const callback = this.callables.get(msg.callableId)!
+      this.remove(msg.callableId)
       // TODO: Resolve to correct error class
       const err = new Error(msg.message)
       err.stack = msg.stack
@@ -109,7 +110,7 @@ export class CallableStore extends EventEmitter {
     } else if (isThreadFunctionMessage(msg)) {
       this.debug('worker %d calling function %s[%d]', id, msg.key, msg.functionId)
       
-      const fnHolder = this.mainFunctions.get(msg.key)
+      const fnHolder = this.callbacks.get(msg.key)
       if (fnHolder) {
         // Note: the function has to be there,
         // if it fails, something is wrong with storing them or garbage collecting
@@ -120,7 +121,7 @@ export class CallableStore extends EventEmitter {
     } else if (isThreadFreeFunctionMessage(msg)) {
       this.debug('worker %d calling free %s[%d]', id, msg.key, msg.functionId)
       
-      const fnHolder = this.mainFunctions.get(msg.key)
+      const fnHolder = this.callbacks.get(msg.key)
       if (fnHolder) {
         fnHolder.delete(msg.functionId)
       }
