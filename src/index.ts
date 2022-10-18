@@ -6,10 +6,10 @@ import getCallsites from './utils/callsites'
 export { withTransfer } from './Transferable'
 import { isMainThread, WorkerOptions } from 'worker_threads'
 import hasTSNode from './utils/has-ts-node'
-import { ThreadMethodKey } from './types/general'
+import { ThreadId } from './types/general'
 import { createSequence } from './utils/sequence'
-import { CallableStore } from './components/callable-store'
 import { WorkerThread } from './WorkerThread'
+import { RequestQueue } from './components/request-queue'
 
 const { threadId: dynamicThreadId, debug: dynamicDebug } = require('./export-bridge')
 export const threadId = dynamicThreadId
@@ -34,19 +34,20 @@ export type ThreadPoolOptions = {
   workerOptions?: WorkerOptions
   startupTimeout?: number
   maxQueueSize?: number
+  autoRefill?: boolean
 }
 
 export interface BaseWorker {
   pool: PoolInterface
 }
 
-export type MainFunctionMap = Map<number, Function>
-
 export interface PoolInterface extends EventEmitter {
   terminate(): void
+  refill(): void
+  drain(shouldTerminate?: boolean): Promise<void>
   size: number
   isTerminated: boolean
-  callbacks: ReadonlyMap<ThreadMethodKey, MainFunctionMap>
+  threads: ReadonlyMap<ThreadId, WorkerThread>
 }
 
 type ProxyWorkerTarget = Record<string, any>
@@ -81,6 +82,7 @@ export async function createThreadPool<T> (workerPath: string, {
   startupTimeout = 30000,
   typecheck = false,
   maxQueueSize = 1000,
+  autoRefill = false
 }: ThreadPoolOptions = {}) {
   // Validate Options
   if (maxQueueSize < size) {
@@ -103,6 +105,18 @@ export async function createThreadPool<T> (workerPath: string, {
   }
 
   const { ext: resolvedWorkerExtension } = path.parse(require.resolve(resolvedWorkerPath))
+
+  const bridgeWorkerPath = path.resolve(__dirname, 'worker')
+  const { ext: bridgeWorkerExtension } = path.parse(require.resolve(bridgeWorkerPath))
+  let workerString = `require('${bridgeWorkerPath}')`
+
+  if (hasTSNode() && [bridgeWorkerExtension, resolvedWorkerExtension].includes('.ts')) {
+    if (typecheck) {
+      workerString = `require('ts-node').register()\n${workerString}`
+    } else {
+      workerString = `require('ts-node/register/transpile-only')\n${workerString}`
+    }
+  }
   
   // TODO: Automatically infer types from worker path if not given
   // const implicitWorkerType = await import('./__tests__/workers/basic');
@@ -124,9 +138,9 @@ export async function createThreadPool<T> (workerPath: string, {
     new <T, H extends object, K extends WorkerType>(target: T, handler: ProxyHandler<H>): K
   }
 
-  const threads: WorkerThread[] = []
+  const threads = new Map<ThreadId, WorkerThread>()
   const availableThreads: WorkerThread[] = []
-  const threadRequests: ThreadRequest[] = []
+  const threadRequests = new RequestQueue()
 
   // Holds the number of queued direct calls via worker.all
   let directCallQueueSize = 0;
@@ -137,93 +151,101 @@ export async function createThreadPool<T> (workerPath: string, {
   const puddleInterface = new EventEmitter()
 
   const removeThread = ({ id }: WorkerThread) => {
-    threads.splice(threads.findIndex(thread => (thread.id === id)), 1)
+    threads.delete(id)
     availableThreads.splice(availableThreads.findIndex(thread => (thread.id === id)), 1)
   }
 
-  const threadCallableStore = new CallableStore(debugOut)
-
-  // Forward callback errors to worker.pool interface
-  threadCallableStore.on('callback:error', (err, id) => {
-    if (puddleInterface.listenerCount('callback:error') > 0) {
-      puddleInterface.emit('callback:error', err, id)
-      return
+  const drain = async (shouldTerminate: boolean = true) => {
+    if (threadRequests.size() > 0 || Array.from(threads.values()).some((thread) => thread.callQueue.length > 0)) {
+      await new Promise<void>((resolve) => puddleInterface.on('ready', () => {
+        if (threads.size === availableThreads.length) {
+          resolve()
+        }
+      }))
     }
-    throw err
-  })
+    
+    if (shouldTerminate) {
+      terminate()
+    }
+  }
+
+  const refill = () => {
+    const diff = size - threads.size
+
+    for (let i = 0; i < diff; i++) {
+      createThread()
+    }
+  }
 
   const createThread = () => {
     debugOut('creating worker thread')
 
-    const bridgeWorkerPath = path.resolve(__dirname, 'worker')
-    const { ext: bridgeWorkerExtension } = path.parse(require.resolve(bridgeWorkerPath))
-    let workerString = `require('${bridgeWorkerPath}')`
-
-    if (hasTSNode() && [bridgeWorkerExtension, resolvedWorkerExtension].includes('.ts')) {
-      if (typecheck) {
-        workerString = `require('ts-node').register()\n${workerString}`
-      } else {
-        workerString = `require('ts-node/register/transpile-only')\n${workerString}`
-      }
-    }
-
-    const thread = new WorkerThread(workerThreadIdSequence.next(), threadId, debugOut, workerString, resolvedWorkerPath, workerOptions, threadCallableStore)
+    const thread = new WorkerThread(workerThreadIdSequence.next(), threadId, debugOut, workerString, resolvedWorkerPath, workerOptions)
+    threads.set(thread.id, thread)
 
     debugOut('creates worker thread %s', thread.id)
 
-    thread.on('ready', () => {
-      if (threadRequests.length > 0) {
-        const request = threadRequests.shift()
+    thread.on('ready', (id) => {
+      if (threadRequests.hasPending()) {
+        const request = threadRequests.next()
         request!.resolve(thread)
         return
       }
-  
+      
       availableThreads.push(thread)
+      
+      puddleInterface.emit('ready', id)
     })
 
     thread.on('message', (msg, id) => {
       puddleInterface.emit('thread:message', msg, id)
     })
 
+    // Forward callback errors to worker.pool interface
+    thread.on('callback:error', (err, id) => {
+      if (puddleInterface.listenerCount('callback:error') > 0) {
+        puddleInterface.emit('callback:error', err, id)
+        return
+      }
+      throw err
+    })
+
     thread.on('startup-error', (err) => {
-      if (threadRequests.length > 0) {
-        const request = threadRequests.shift()
+      // TODO: There might be more than one request
+      // -> startup error should be handled elsewhere
+      if (threadRequests.hasPending()) {
+        const request = threadRequests.next()
         request!.reject(err)
       }
     })
 
     thread.on('exit', (code, id) => {
+      removeThread(thread)
       puddleInterface.emit('exit', code, id)
 
-      // TODO: Ensure thread is not removed after being created from error
-      removeThread(thread)
+      if (!isTerminated && autoRefill) {
+        refill()
+      }
       
-      if (threads.length === 0) {
+      if (threads.size === 0) {
         terminate()
 
         const err = new Error('All workers exited before resolving (use an error event handler or DEBUG=puddle:*)')
-        for (const workerRequest of threadRequests) {
-          workerRequest.reject(err)
-        }
+        threadRequests.rejectAll(err)
       }
     })
 
     thread.on('error', (err, id) => {
       if (puddleInterface.listenerCount('error') > 0) {
         puddleInterface.emit('error', err, id)
+      } else {
+        terminate()
       }
-
-      terminate()
     })
-
-    threads.push(thread)
   }
 
   debugOut('filling puddle with thread liquid...')
-
-  for (let i = 0; i < size; i += 1) {
-    createThread()
-  }
+  refill()
 
   const getAvailableThread = () => new Promise<WorkerThread>((resolve, reject) => {
     if (isTerminated) {
@@ -236,7 +258,7 @@ export async function createThreadPool<T> (workerPath: string, {
       return resolve(thread)
     }
 
-    if (threadRequests.length + directCallQueueSize >= maxQueueSize) {
+    if (threadRequests.size() + directCallQueueSize >= maxQueueSize) {
       return reject(new Error('Max thread queue size reached'))
     }
 
@@ -254,12 +276,12 @@ export async function createThreadPool<T> (workerPath: string, {
     
     isTerminated = true
     
-    for (const thread of threads) {
+    threads.forEach((thread) => {
       thread.terminate()
-    }
+    })
   }
 
-  await Promise.all(threads.map((thread) => new Promise<void>((resolve, reject) => {
+  await Promise.all(Array.from(threads.values()).map((thread) => new Promise<void>((resolve, reject) => {
     const timeout = setTimeout(() => {
       terminate()
       reject(new Error(`Worker ${thread.id} initialization timed out`))
@@ -292,17 +314,19 @@ export async function createThreadPool<T> (workerPath: string, {
   // { function1: { roundTrip: { avg: 25, median: 23, max: 934 }, calls: 1564 } }
 
   Object.assign(puddleInterface, {
-    terminate
+    terminate,
+    refill,
+    drain
   })
   Object.defineProperties(puddleInterface, {
     size: {
-      get: () => threads.length
+      get: () => threads.size
     },
     isTerminated: {
       get: () => isTerminated
     },
-    callbacks: {
-      get: () => threadCallableStore.mainFunctions
+    threads: {
+      get: () => threads
     }
   })
 
@@ -316,13 +340,13 @@ export async function createThreadPool<T> (workerPath: string, {
         return undefined
       }
 
-      if (threadRequests.length + directCallQueueSize >= maxQueueSize) {
+      if (threadRequests.size() + directCallQueueSize >= maxQueueSize) {
         return () => Promise.reject(new Error('Max thread queue size reached'))
       }
 
       availableThreads.splice(0)
       return (...args: any[]) => Promise.all(
-        threads.map(thread => new Promise((resolve, reject) => {
+        Array.from(threads.values()).map(thread => new Promise((resolve, reject) => {
           directCallQueueSize += 1
           thread.callOnThread(key, args, (value: any) => {
             directCallQueueSize -= 1

@@ -93,6 +93,7 @@ Arguments:
   - `startupTimeout` - if a worker thread cannot be started within this timout in milliseconds, the pool creation will fail and reject with a timout error. Defaults to `30000`.
   - `typecheck` - In development `ts-node` is used, which by default runs `transpile-only` mode. To get type checks, set this to `true`.
   - `maxQueueSize` - When filled up with waiting calls, will reject all subsequent calls, until emptied to below max again. Defaults to `1000`
+  - `autoRefill` - Automatically fills up the pool with workers until `size` is reached when workers unexpectedly exit. Defaults to `false`.
 
 If the pool size is `> 1`, method calls will be forwarded to the next available worker. If all workers are busy, the method calls will be queued. A worker will handle one method call at any time only.
 
@@ -103,7 +104,7 @@ On the Proxy Object returned from `createThreadPool`, you can call any method wh
 - `method` - Must match a method name exported from the worker module.
 - `arguments` - Arbitrary number of arguments forwarded to the method call in the worker thread.
 
-`Arguments` are transferred to the worker thread via [`postMessage`](https://nodejs.org/dist/latest-v12.x/docs/api/worker_threads.html#worker_threads_port_postmessage_value_transferlist), compatible with the [HTML structured clone algorithm](https://developer.mozilla.org/en-US/docs/Web/API/Web_Workers_API/Structured_clone_algorithm). If you want to move arguments of type `ArrayBuffer` or `MessageChannel` instead of copying them, you can use the `withTransfer` helper.
+`Arguments` are transferred to the worker thread via [`postMessage`](https://nodejs.org/dist/latest-v12.x/docs/api/worker_threads.html#worker_threads_port_postmessage_value_transferlist), compatible with the [HTML structured clone algorithm](https://developer.mozilla.org/en-US/docs/Web/API/Web_Workers_API/Structured_clone_algorithm). If you want to move arguments of type `ArrayBuffer` or `MessageChannel` instead of copying them, you can use the [`withTransfer`](#withtransfervalue-transferlist) helper.
 
 `Arguments` can contain a __`function`__ (__callback__) in the first level, which will be callable from the thread via a reference, but be executed on the main thread.
 __However__, the result of the callback is currently __not__ transfered back to the thread. It is possible to implement a worker thread with an `EventEmitter` though, see the [eventemitter example](./examples/ts-eventemitter/). Callback errors will throw an `unhandled exception` if no error listener is attached to the pool `callback:error` event like `worker.pool.on('callback:error', () => ...)`.
@@ -143,6 +144,14 @@ Will call the given `method` on all workers, as soon as they become available. R
 
 Terminates the pool and all worker threads in it. Trying to call methods in the pool afterwards, will result in an rejection.
 
+### `worker.pool.refill()`
+
+Fills up the pool with workers until `size` is reached. Can be used to manually decide wether to refill or terminate.
+
+### `worker.pool.drain()`
+
+Waits until all calls are handled and threads are idle, then terminates all threads.
+
 ### `worker.pool.size`
 
 The number of worker threads in the pool.
@@ -153,7 +162,7 @@ Wether or not the pool was terminated.
 
 ### `withTransfer(value, [transferList])`
 
-This helper can be used **bi-directional**, to transfer values to a worker thread as method call argument(s), or to transfer values from a worker thread method.
+This helper can be used **bi-directional**, to transfer values to a worker thread as method call argument(s), or to transfer return values from a worker thread method.
 
 Arguments:
 
@@ -197,7 +206,7 @@ Forwards errors that are emitted for a specific worker in the pool. When a worke
 
 #### `exit`
 
-Forwards exit events that are emitted for a specific worker in the pool, addind the `threadId` as second argument.
+Forwards exit events that are emitted for a specific worker in the pool, adding the `threadId` as second argument.
 
 ## Debug
 

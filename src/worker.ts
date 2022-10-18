@@ -5,6 +5,7 @@ import {
   BaseMainMessage,
   CallMessage,
   InitMessage,
+  MainMessageAction,
   ThreadCallbackMessage,
   ThreadErrorMessage,
   ThreadFreeFunctionMessage,
@@ -82,8 +83,8 @@ parentPort.once('message', async (msg: InitMessage) => {
 
   port.on('message', async (msg: BaseMainMessage) => {
     switch (msg.action) {
-      case 'call': {
-        const { key, args, callbackId, argFunctionPositions } = msg as CallMessage
+      case MainMessageAction.CALL: {
+        const { key, args, callableId, argFunctionPositions } = msg as CallMessage
         debug('calling worker thread method %s', key)
 
         try {
@@ -121,7 +122,7 @@ parentPort.once('message', async (msg: InitMessage) => {
           if (result instanceof TransferableValue) {
             const resultMsg: ThreadCallbackMessage = {
               action: ThreadMessageAction.RESOLVE,
-              callbackId,
+              callableId,
               result: result.obj
             }
             
@@ -129,7 +130,7 @@ parentPort.once('message', async (msg: InitMessage) => {
           } else {
             const resultMsg: ThreadCallbackMessage = { 
               action: ThreadMessageAction.RESOLVE, 
-              callbackId, 
+              callableId, 
               result 
             }
             port.postMessage(resultMsg)
@@ -138,7 +139,7 @@ parentPort.once('message', async (msg: InitMessage) => {
           debug(message)
           const resultMsg: ThreadErrorMessage = { 
             action: ThreadMessageAction.REJECT, 
-            callbackId, 
+            callableId, 
             message: message as string, 
             stack: stack as string 
           }

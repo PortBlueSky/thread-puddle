@@ -15,6 +15,10 @@ export class WorkerWithCallback {
       callback(result)
     }, timeout)
   }
+
+  triggerExit() {
+    setTimeout(() => process.exit(), 25)
+  }
 }
 
 export default new WorkerWithCallback()

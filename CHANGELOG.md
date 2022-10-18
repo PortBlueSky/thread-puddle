@@ -3,11 +3,19 @@
 ## Version 0.4.0
   - Basic Callback Functions #21
     - Workers can now implement EventEmitter behaviour
-    - Worker paths can now be relative
-    - ts-node is now `transpile-only` per default
-    - Allows chaining (resolves to the proxy when the worker returns itself)
-    - Upgrade all dev dependencies
-    - Improved typing
+  - Worker paths can now be relative
+  - ts-node is now `transpile-only` per default #21
+  - Allows chaining (resolves to the proxy when the worker returns itself)
+  - Upgrade all dev dependencies
+  - Improved typing
+  - Max Queue Size #29
+    - Subsequent calls will be rejected when max queue size is reached,
+    until the queue is emptied below max again.
+  - Refill
+    - automatically refill pool when workers exit via `autoRefill: true` pool option
+    - manually refill pool whenever via `worker.pool.refill()`
+  - Drain (graceful shutdown)
+    - Wait until all calls are done and workers are idle, then terminate, via `worker.pool.drain()`
 
 ## Version 0.3.2
   - Stricter and fixed types #16
