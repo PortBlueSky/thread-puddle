@@ -18,4 +18,15 @@ describe('has-ts-node', () => {
     const has = hasTsNode(resolve)
     expect(has).toEqual(false)
   })
+
+  it('rethrows the error if anything else', () => {
+    const resolve = () => {
+      const err = {
+        code: 'whatever'
+      }
+      throw err
+    }
+    
+    expect(() => hasTsNode(resolve)).toThrow()
+  })
 })
