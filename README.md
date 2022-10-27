@@ -13,6 +13,7 @@ A library to pool Node.js [worker threads](https://nodejs.org/dist/latest-v13.x/
 __+ Full TypeScript Support__ (optionally using [ts-node](https://github.com/TypeStrong/ts-node) in development)  
 __+ Only one dependency__ (the `debug` package)  
 __+ Callbacks__ (workers can call back functions on the main thread)
+__+ Graceful Shutdown__ (drains the pool and terminates)
 
 
 ### Installation
