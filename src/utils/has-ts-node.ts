@@ -1,6 +1,6 @@
-export default function hasTSNode() {
+export default function hasTSNode(resolveFn: Function) {
   try {
-    require.resolve('ts-node')
+    resolveFn('ts-node')
     return true
   } catch (error: any) {
     if (error && error.code === 'MODULE_NOT_FOUND') {

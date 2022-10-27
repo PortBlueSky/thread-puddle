@@ -110,7 +110,7 @@ export async function createThreadPool<T> (workerPath: string, {
   const { ext: bridgeWorkerExtension } = path.parse(require.resolve(bridgeWorkerPath))
   let workerString = `require('${bridgeWorkerPath}')`
 
-  if (hasTSNode() && [bridgeWorkerExtension, resolvedWorkerExtension].includes('.ts')) {
+  if (hasTSNode(require.resolve) && [bridgeWorkerExtension, resolvedWorkerExtension].includes('.ts')) {
     if (typecheck) {
       workerString = `require('ts-node').register()\n${workerString}`
     } else {
