@@ -1,7 +1,5 @@
 # Examples
 
-## Typescript Examples
-
 ```bash
 yarn build
 npx ts-node path/to/example.ts

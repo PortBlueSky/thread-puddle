@@ -42,14 +42,12 @@ export default new MyWorker()
 import { createThreadPool } from '../../lib'
 import { MyWorker } from './worker'
 
-async function start () {
-  const worker = await createThreadPool<MyWorker>('./worker')
+(async () => {
+  const worker = await createThreadPool<IMyWorker>('./worker')
   await worker.say() // -> "Hello!"
   
   worker.pool.terminate()
-}
-
-start()
+})()
 ```
 
 This and more examples can be found in the `examples` directory.
