@@ -50,6 +50,7 @@ export type ThreadFunctionMessage = BaseThreadMessage & {
   functionId: CallableId
   key: ThreadMethodKey
   args: any[]
+  pos: number
 }
 
 export type ThreadFreeFunctionMessage = BaseThreadMessage & {

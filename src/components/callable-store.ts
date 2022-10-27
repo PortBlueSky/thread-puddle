@@ -115,7 +115,7 @@ export class CallableStore extends EventEmitter {
         // Note: the function has to be there,
         // if it fails, something is wrong with storing them or garbage collecting
         const mFn = fnHolder.get(msg.functionId)!
-        Promise.resolve().then(() => mFn(...msg.args)).catch((err) => this.emit('callback:error', err, id))
+        Promise.resolve().then(() => mFn(...msg.args)).catch((err) => this.emit('callback:error', err, id, msg.key, msg.pos))
       }
       return true
     } else if (isThreadFreeFunctionMessage(msg)) {

@@ -202,9 +202,9 @@ export async function createThreadPool<T> (workerPath: string, {
     })
 
     // Forward callback errors to worker.pool interface
-    thread.on('callback:error', (err, id) => {
+    thread.on('callback:error', (err, id, methodName, cbPosition) => {
       if (puddleInterface.listenerCount('callback:error') > 0) {
-        puddleInterface.emit('callback:error', err, id)
+        puddleInterface.emit('callback:error', err, id, methodName, cbPosition)
         return
       }
       throw err

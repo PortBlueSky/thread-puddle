@@ -36,8 +36,8 @@ export class WorkerThread extends EventEmitter {
     this.id = id
     this.callableStore = new CallableStore(debug)
 
-    this.callableStore.on('callback:error', (err, id) => {
-      this.emit('callback:error', err, id)
+    this.callableStore.on('callback:error', (err, id, methodName, cbPosition) => {
+      this.emit('callback:error', err, id, methodName, cbPosition)
     })
 
     const worker = new Worker(workerString, { ...workerOptions, eval: true })
