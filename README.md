@@ -88,7 +88,7 @@ Arguments:
 - `workerPath` - an absolute or relative path to a module.
 - `options` - optional settings:
   - `size`- the number of worker threads to be created in the pool for the given module. Defaults to `1`.
-  - `workerOptions` - will be used as options for the [worker thread constructor](https://nodejs.org/dist/latest-v12.x/docs/api/worker_threads.html#worker_threads_new_worker_filename_options). Defaults to `{}`.
+  - `workerOptions` - will be used as options for the [worker thread constructor](https://nodejs.org/dist/latest-v18.x/docs/api/worker_threads.html#new-workerfilename-options). Defaults to `{}`.
   - `startupTimeout` - if a worker thread cannot be started within this timout in milliseconds, the pool creation will fail and reject with a timout error. Defaults to `30000`.
   - `typecheck` - In development `ts-node` is used, which by default runs `transpile-only` mode. To get type checks, set this to `true`.
   - `maxQueueSize` - When filled up with waiting calls, will reject all subsequent calls, until emptied to below max again. Defaults to `1000`
