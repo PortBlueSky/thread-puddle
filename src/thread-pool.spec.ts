@@ -699,7 +699,7 @@ describe('Callbacks', () => {
     worker.pool.terminate()
 
     expect(handler).toHaveBeenCalledTimes(1)
-    expect(handler).toHaveBeenCalledWith(err, expect.any(Number))
+    expect(handler).toHaveBeenCalledWith(err, expect.any(Number), 'withCallback', 2)
   })
 
   it('forwards callback rejects to callback:error event', async () => {
@@ -718,7 +718,7 @@ describe('Callbacks', () => {
     worker.pool.terminate()
 
     expect(handler).toHaveBeenCalledTimes(1)
-    expect(handler).toHaveBeenCalledWith(err, expect.any(Number))
+    expect(handler).toHaveBeenCalledWith(err, expect.any(Number), 'withCallback', 2)
   })
 
   it.skip('throws if there is no callback:error listener', async () => {

@@ -102,7 +102,8 @@ parentPort.once('message', async (msg: InitMessage) => {
                   action: ThreadMessageAction.CALL_FUNCTION,
                   functionId: id,
                   key,
-                  args: cbArgs
+                  args: cbArgs,
+                  pos: fnArgPos,
                 }
                 port.postMessage(fnMsg)
               }
