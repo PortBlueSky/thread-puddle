@@ -7,10 +7,12 @@ jobs:
   tests:
     strategy:
       matrix:
-        version: 
+        version:
           - "14.17.0"
           - "16.17.1"
-          - "18.10.0"
+          - "18.20.2"
+          - "20.12.2"
+          - "22.0.0"
     runs-on: ubuntu-latest
     steps:
       - name: Checkout branch
