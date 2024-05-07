@@ -14,7 +14,7 @@ describe('has-ts-node', () => {
       }
       throw err
     }
-    
+
     const has = hasTsNode(resolve)
     expect(has).toEqual(false)
   })
@@ -26,7 +26,7 @@ describe('has-ts-node', () => {
       }
       throw err
     }
-    
+
     expect(() => hasTsNode(resolve)).toThrow()
   })
 })

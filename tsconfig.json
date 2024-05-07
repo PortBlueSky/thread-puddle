@@ -2,7 +2,7 @@
   "compilerOptions": {
     "declaration": true,
     "strictNullChecks": true,
-    "target": "esnext", 
+    "target": "esnext",
     "outDir": "lib",
     "module": "commonjs",
     "moduleResolution": "node",
@@ -17,12 +17,11 @@
   },
   "include": [
     "src",
+    "relative.spec.ts",
   ],
   "exclude": [
     "node_modules/**",
     "lib",
     "examples",
-    "src/__tests__",
-    "**/*.spec.ts",
   ]
 }

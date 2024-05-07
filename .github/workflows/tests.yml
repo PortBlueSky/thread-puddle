@@ -23,6 +23,8 @@ jobs:
           node-version: ${{ matrix.version }}
       - name: Install dependencies
         run: yarn --immutable
+      - name: Run Lint
+        run: yarn lint:ci
       - name: Run Tests
         run: yarn test
       - name: Run Garbage Collection Tests

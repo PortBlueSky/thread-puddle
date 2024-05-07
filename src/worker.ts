@@ -1,7 +1,7 @@
 import { parentPort } from 'worker_threads'
 import createDebug from 'debug'
 import { TransferableValue } from './Transferable'
-import { 
+import {
   BaseMainMessage,
   CallMessage,
   InitMessage,
@@ -10,7 +10,7 @@ import {
   ThreadErrorMessage,
   ThreadFreeFunctionMessage,
   ThreadFunctionMessage,
-  ThreadMessageAction 
+  ThreadMessageAction
 } from './types/messages'
 import { FunctionId, ThreadMethodKey } from './types/general'
 import majorNodeVersion from './utils/major-node-version'
@@ -34,7 +34,7 @@ parentPort.once('message', async (msg: InitMessage) => {
   }
 
   debug('Initializing worker thread...')
-  let worker: Record<string, Function | any> | null = null
+  let worker: Record<string, any> | null = null
 
   dynamicExports.threadId = id
   dynamicExports.debug = debug
@@ -62,7 +62,7 @@ parentPort.once('message', async (msg: InitMessage) => {
     return
   }
 
-  const functionRegistry = new FinalizationRegistry(({id, key }: { id: FunctionId, key: ThreadMethodKey }) => {
+  const functionRegistry = new FinalizationRegistry(({ id, key }: { id: FunctionId, key: ThreadMethodKey }) => {
     debug('thread freeing method %s for %s', id, key)
 
     const fnMsg: ThreadFreeFunctionMessage = {
@@ -77,7 +77,7 @@ parentPort.once('message', async (msg: InitMessage) => {
   // TODO: Handle message error. 
   // Rare and possibly fatal as promises may never be resolved.
   // Note: This happens when trying to receive an array buffer that has already been detached.
-  port.on('messageerror', (err: Error) => {
+  port.on('messageerror', () => {
     // Consider pool termination and reject all open promises
   })
 
@@ -107,7 +107,7 @@ parentPort.once('message', async (msg: InitMessage) => {
                 }
                 port.postMessage(fnMsg)
               }
-              functionRegistry.register(fn, { id, key } , fn)
+              functionRegistry.register(fn, { id, key }, fn)
               args[fnArgPos] = fn
             }
           }
@@ -118,31 +118,31 @@ parentPort.once('message', async (msg: InitMessage) => {
 
           if (result === worker) {
             result = '__THIS__'
-          } 
-          
+          }
+
           if (result instanceof TransferableValue) {
             const resultMsg: ThreadCallbackMessage = {
               action: ThreadMessageAction.RESOLVE,
               callableId,
               result: result.obj
             }
-            
+
             port.postMessage(resultMsg, result.transferables)
           } else {
-            const resultMsg: ThreadCallbackMessage = { 
-              action: ThreadMessageAction.RESOLVE, 
-              callableId, 
-              result 
+            const resultMsg: ThreadCallbackMessage = {
+              action: ThreadMessageAction.RESOLVE,
+              callableId,
+              result
             }
             port.postMessage(resultMsg)
           }
         } catch ({ message, stack }) {
           debug(message)
-          const resultMsg: ThreadErrorMessage = { 
-            action: ThreadMessageAction.REJECT, 
-            callableId, 
-            message: message as string, 
-            stack: stack as string 
+          const resultMsg: ThreadErrorMessage = {
+            action: ThreadMessageAction.REJECT,
+            callableId,
+            message: message as string,
+            stack: stack as string
           }
           port.postMessage(resultMsg)
         }
@@ -157,7 +157,7 @@ parentPort.once('message', async (msg: InitMessage) => {
 
   // Note: Node < 16 does not exit and throw unhandled promise rejections
   if (majorNodeVersion < 16) {
-    process.on('unhandledRejection', (reason, promise) => {
+    process.on('unhandledRejection', (reason) => {
       throw reason
     });
   }

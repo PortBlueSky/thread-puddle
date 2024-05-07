@@ -67,7 +67,7 @@ describe('Basic Features', () => {
 
   it('throws error if method is not available on worker', async () => {
     try {
-      // @ts-ignore
+      // @ts-expect-error testing a non-existing method
       await worker.notWorkerMethod()
       expect(false).toBe(true)
     } catch (err) {
@@ -227,7 +227,7 @@ describe('Queue Size', () => {
         size: 1,
         maxQueueSize: 0,
       })
-    } catch(err) {
+    } catch (err) {
       spy(err)
     }
     expect(spy).toHaveBeenCalledTimes(1)
@@ -238,15 +238,15 @@ describe('Queue Size', () => {
       size: 1,
       maxQueueSize: 1,
     })
-    
+
     const spy = jest.fn((err) => {
       expect(err).toHaveProperty('message', 'Max thread queue size reached')
     })
 
-    const waiters = Promise.all([
+    Promise.all([
       worker.asyncFn(1, 100),
       worker.asyncFn(1, 100)
-    ]).catch(() => {/* ignore */})
+    ]).catch(() => {/* ignore */ })
 
     try {
       await worker.asyncFn(1, 100)
@@ -263,15 +263,15 @@ describe('Queue Size', () => {
       size: 1,
       maxQueueSize: 2,
     })
-    
+
     const spy = jest.fn((err) => {
       expect(err).toHaveProperty('message', 'Max thread queue size reached')
     })
 
-    const waiters = Promise.all([
+    Promise.all([
       worker.all.asyncFn(1, 100),
       worker.all.asyncFn(1, 100)
-    ]).catch(() => {/* ignore */})
+    ]).catch(() => {/* ignore */ })
 
     try {
       await worker.asyncFn(1, 100)
@@ -315,7 +315,7 @@ if (majorVersion >= 13) {
     })
 
     it.todo('make them work again')
-  
+
     it.skip('can expose methods from worker module', async () => {
       worker = await createThreadPool(path.resolve(__dirname, './__tests__/workers/es6-module.mjs'), {
         size: 2
@@ -359,7 +359,7 @@ describe('Nested Threads', () => {
 
 describe('Error Handling', () => {
   it('forwards worker method errors with worker stack trace', async () => {
-    const worker:any  = await createThreadPool(basicWorkerPath, {
+    const worker: any = await createThreadPool(basicWorkerPath, {
       size: 2
     })
 
@@ -374,7 +374,7 @@ describe('Error Handling', () => {
   })
 
   it('forwards worker process errors within method', async () => {
-    const worker:any  = await createThreadPool(basicWorkerPath, {
+    const worker: any = await createThreadPool(basicWorkerPath, {
       size: 2
     })
 
@@ -389,7 +389,7 @@ describe('Error Handling', () => {
   })
 
   it('terminates the thread pool on uncaught exception', async () => {
-    const worker:any  = await createThreadPool(basicWorkerPath, {
+    const worker: any = await createThreadPool(basicWorkerPath, {
       size: 2
     })
 
@@ -401,7 +401,7 @@ describe('Error Handling', () => {
   })
 
   it('rejects open method calls when a worker crashes', async () => {
-    const worker:any  = await createThreadPool(basicWorkerPath, {
+    const worker: any = await createThreadPool(basicWorkerPath, {
       size: 2
     })
 
@@ -419,12 +419,12 @@ describe('Error Handling', () => {
       'Worker thread exited before resolving': 1,
       'All workers exited before resolving (use an error event handler or DEBUG=puddle:*)': 2
     })
-    
+
     worker.pool.terminate()
   })
 
   it('rejects open method calls when worker exits', async () => {
-    const worker:any  = await createThreadPool(basicWorkerPath, {
+    const worker: any = await createThreadPool(basicWorkerPath, {
       size: 2
     })
 
@@ -437,7 +437,7 @@ describe('Error Handling', () => {
   })
 
   it('rejects waiting method calls when all workers exited', async () => {
-    const worker:any  = await createThreadPool(basicWorkerPath, {
+    const worker: any = await createThreadPool(basicWorkerPath, {
       size: 2
     })
 
@@ -473,7 +473,7 @@ describe('Error Handling', () => {
   })
 
   it('rejects open method calls when a worker throws unhandled rejection', async () => {
-    const worker:any  = await createThreadPool(basicWorkerPath, {
+    const worker: any = await createThreadPool(basicWorkerPath, {
       size: 2
     })
 
@@ -491,7 +491,7 @@ describe('Error Handling', () => {
       'Worker thread exited before resolving': 1,
       'All workers exited before resolving (use an error event handler or DEBUG=puddle:*)': 2
     })
-    
+
     worker.pool.terminate()
   })
 })
@@ -533,7 +533,7 @@ describe('Startup', () => {
     const startupError = await createThreadPool(startupFailWorkerPath, {
       size: 2
     }).catch(err => err)
-    
+
     expect(startupError).toBeInstanceOf(Error)
     expect(startupError).toHaveProperty('message', 'Failing before even exporting any method')
   })
@@ -587,7 +587,7 @@ describe('Chaining', () => {
   it('returns the proxy when a worker object returns itself', async () => {
     const worker = await createThreadPool<ChainWorkerClass>('./__tests__/workers/this')
 
-    const result = await (await worker.chain()).follow()
+    const result = (await worker.chain()).follow()
     worker.pool.terminate()
 
     expect(result).toEqual('works')
@@ -628,7 +628,7 @@ describe('Callbacks', () => {
   it.skip('transfers result of the callback back to the thread', async () => {
     const worker = await createThreadPool<WorkerWithCallback>('./__tests__/workers/callback')
 
-    const asyncFn = async (...args: any[]) => {
+    const asyncFn = async () => {
       return new Promise<number>((resolve) => setTimeout(() => resolve(12345), 100))
     }
     const result = await worker.withCallbackReturn(1, 2, asyncFn)
@@ -659,10 +659,10 @@ describe('Callbacks', () => {
     const callback2 = jest.fn()
     worker.withDelayedCallback(1, 2, 100, callback1)
     worker.withDelayedCallback(2, 2, 10, callback2)
-    
+
     await new Promise<void>((resolve) => setTimeout(() => resolve(), 1000))
     worker.pool.terminate()
-    
+
     expect(callback1).toHaveBeenCalledTimes(1)
     expect(callback1).toHaveBeenCalledWith(3)
     expect(callback2).toHaveBeenCalledTimes(1)
@@ -675,7 +675,7 @@ describe('Callbacks', () => {
     const callback = jest.fn()
     await worker.on('some:event', callback)
     await worker.triggerSomething(10, 20)
-    
+
     await new Promise<void>((resolve) => setTimeout(() => resolve(), 1000))
     worker.pool.terminate()
 
@@ -689,12 +689,12 @@ describe('Callbacks', () => {
     const handler = jest.fn()
     worker.pool.on('callback:error', handler)
     const err = new Error('callback threw')
-    const fn = (val: number) => {
+    const fn = () => {
       throw err
     }
-    
+
     await worker.withCallback(1, 2, fn)
-    
+
     await new Promise<void>((resolve) => setTimeout(() => resolve(), 100))
     worker.pool.terminate()
 
@@ -708,12 +708,12 @@ describe('Callbacks', () => {
     const handler = jest.fn()
     worker.pool.on('callback:error', handler)
     const err = new Error('callback rejected')
-    const fn = async (val: number) => {
-      return new Promise((resolve, reject) => setTimeout(() => reject(err), 50))
+    const fn = async () => {
+      return new Promise((_, reject) => setTimeout(() => reject(err), 50))
     }
-    
+
     await worker.withCallback(1, 2, fn)
-    
+
     await new Promise<void>((resolve) => setTimeout(() => resolve(), 100))
     worker.pool.terminate()
 
@@ -725,14 +725,14 @@ describe('Callbacks', () => {
     const worker = await createThreadPool<WorkerWithCallback>('./__tests__/workers/callback')
 
     const err = new Error('callback rejected')
-    const fn = async (val: number) => {
-      return new Promise((resolve, reject) => setTimeout(() => reject(err), 50))
+    const fn = async () => {
+      return new Promise((_, reject) => setTimeout(() => reject(err), 50))
     }
 
     // TODO: How to catch the broken promise chain here?
-        
+
     await worker.withCallback(1, 2, fn)
-    
+
     await new Promise<void>((resolve) => setTimeout(() => resolve(), 100))
     worker.pool.terminate()
   })
@@ -740,19 +740,19 @@ describe('Callbacks', () => {
   it('frees main functions when threads holding references exit', async () => {
     const worker = await createThreadPool<WorkerWithCallback>('./__tests__/workers/callback')
 
-    const fn = () => {}
+    const fn = () => { }
     worker.withCallback(10, 20, fn)
 
     await new Promise<void>((resolve) => setTimeout(() => resolve(), 100))
 
     const thread: WorkerThread = worker.pool.threads.values().next().value
-    let numberOfStoredMethods = thread.callableStore.callbacks.get('withCallback')?.size
+    const numberOfStoredMethods = thread.callableStore.callbacks.get('withCallback')?.size
     expect(numberOfStoredMethods).toEqual(1)
 
     worker.triggerExit()
 
     await new Promise<void>((resolve) => setTimeout(() => resolve(), 100))
-    
+
     const callbacks = thread.callableStore.callbacks.get('withCallback')
     expect(callbacks).toEqual(undefined)
 
