@@ -1,5 +1,4 @@
 /* eslint-env jest */
-import path from 'path'
 import { createThreadPool } from './index'
 import debug from 'debug'
 import { WorkerWithCallback } from './__tests__/workers/callback'

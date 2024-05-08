@@ -51,6 +51,9 @@ export interface PoolInterface extends EventEmitter {
 }
 
 type ProxyWorkerTarget = Record<string, any>
+type ProxyWorkerHandler =  {
+    get: (proxyTarget: ProxyWorkerTarget, key: string) => any;
+}
 
 type FilterType<Base, Condition> = Pick<Base, {
   [Key in keyof Base]: Base[Key] extends Condition ? Key : never
@@ -68,10 +71,11 @@ type WrapReturnType<Base extends TypeWithMethods> = {
     : (...a: Parameters<Base[Key]>) => Promise<ReturnType<Base[Key]>>;
 };
 
-// @ts-ignore
 // TODO: Fix usage of interface vs. type
 // Even though this complains, the type is inferred from the template correctly,
 // working for classes/interfaces and types
+// @ts-expect-error Using function type explicitly here
+// eslint-disable-next-line @typescript-eslint/ban-types
 type FilterAndWrap<Base> = WrapReturnType<FilterType<Required<Base>, Function>> 
 
 export type WrapWorkerType<Base> = FilterAndWrap<Base> & BaseWorker & { all: FilterAndWrap<Base> }
@@ -372,9 +376,7 @@ export async function createThreadPool<T> (workerPath: string, {
   }
 
   // Intermediate, so the proxy can return itself
-  let proxy: ExtendedWorkerType
-  
-  const handler = {
+  const proxy: ExtendedWorkerType = new PoolProxy<TargetWorkerType, ProxyWorkerHandler, ExtendedWorkerType> (target, {
     get: (proxyTarget: ProxyWorkerTarget, key: string) => {
       // NOTE: If the proxy is returned from an async function,
       // the engine checks if it is a thenable by checking existence of a then method
@@ -400,8 +402,7 @@ export async function createThreadPool<T> (workerPath: string, {
         return result
       }
     }
-  }
+  })
 
-  proxy = new PoolProxy<typeof target, typeof handler, ExtendedWorkerType> (target, handler)
   return proxy
 }

@@ -587,7 +587,7 @@ describe('Chaining', () => {
   it('returns the proxy when a worker object returns itself', async () => {
     const worker = await createThreadPool<ChainWorkerClass>('./__tests__/workers/this')
 
-    const result = (await worker.chain()).follow()
+    const result = await (await worker.chain()).follow()
     worker.pool.terminate()
 
     expect(result).toEqual('works')
