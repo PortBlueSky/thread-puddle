@@ -68,7 +68,9 @@ export type AsyncMethod = (...param: any) => Promise<any>
 type WrapReturnType<Base extends TypeWithMethods> = {
   [Key in keyof Base]: Base[Key] extends AsyncMethod
     ? Base[Key] 
-    : (...a: Parameters<Base[Key]>) => Promise<ReturnType<Base[Key]>>;
+    : (...a: Parameters<Base[Key]>) => ReturnType<Base[Key]> extends Base
+      ? Promise<FilterAndWrap<Base>>
+      : Promise<ReturnType<Base[Key]>>;
 };
 
 // TODO: Fix usage of interface vs. type
