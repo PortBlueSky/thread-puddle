@@ -10,15 +10,15 @@
   "author": "Sebastian Herrlinger <hasta84@gmail.com>",
   "license": "MIT",
   "devDependencies": {
-    "@types/debug": "4.1.7",
-    "@types/jest": "29.1.1",
+    "@types/debug": "4.1.12",
+    "@types/jest": "29.5.12",
     "@types/node": "18.8.0",
-    "@typescript-eslint/eslint-plugin": "^7.7.1",
-    "@typescript-eslint/parser": "^7.7.1",
+    "@typescript-eslint/eslint-plugin": "7.8.0",
+    "@typescript-eslint/parser": "7.8.0",
     "eslint": "8.57.0",
-    "jest": "29.1.2",
-    "ts-jest": "29.0.3",
-    "ts-node": "10.9.1",
+    "jest": "29.7.0",
+    "ts-jest": "29.1.2",
+    "ts-node": "10.9.2",
     "typescript": "4.8.4"
   },
   "scripts": {
