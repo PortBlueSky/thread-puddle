@@ -11,6 +11,7 @@ export interface Callable {
   done?: (success: boolean) => void
 }
 
+// eslint-disable-next-line @typescript-eslint/ban-types
 export type MainFunctionMap = Map<number, Function>
 
 export class CallableStore extends EventEmitter {
@@ -39,7 +40,7 @@ export class CallableStore extends EventEmitter {
     const callableId = this.callableSequence.next()
     this.callables.set(callableId, callable)
 
-    let argFunctionPositions: number[] = []
+    const argFunctionPositions: number[] = []
     const transferables: Transferable[] = []
     const iteratedArgs = args.map((arg: any, index: number) => {
       if (arg instanceof TransferableValue) {
@@ -54,6 +55,7 @@ export class CallableStore extends EventEmitter {
       if (typeof arg === 'function') {
         argFunctionPositions.push(index)
         if (!this.callbacks.has(key)) {
+          // eslint-disable-next-line @typescript-eslint/ban-types
           this.callbacks.set(key, new Map<number, Function>)
         }
         const fnHolder = this.callbacks.get(key)!
