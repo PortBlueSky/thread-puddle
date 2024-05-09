@@ -1,5 +1,4 @@
 import { withTransfer } from '../../'
-import util from 'util'
 
 const uint8Array = new Uint8Array([1, 2, 3, 4])
 const uint16Array = new Uint16Array([1, 2, 3, 4])
@@ -17,48 +16,48 @@ module.exports = {
     return tr
   },
   getTransferred32Array: () => withTransfer(uint32Array),
-  setArray: (arr) => {
+  setArray: (arr: any) => {
     if (!(arr instanceof Uint8Array)) {
       throw new Error('Expected Uint8Array')
     }
     return 'ok'
   },
-  set16Array: (arr) => {
+  set16Array: (arr: any) => {
     if (!(arr instanceof Uint16Array)) {
       throw new Error('Expected Uint16Array')
     }
     return 'ok'
   },
-  set32Array: (arr) => {
+  set32Array: (arr: any) => {
     if (!(arr instanceof Uint32Array)) {
       throw new Error('Expected Uint32Array')
     }
     return 'ok'
   },
-  setTransferredArray: (arr) => {
+  setTransferredArray: (arr: any) => {
     if (!(arr instanceof Uint8Array)) {
       throw new Error('Expected Uint8Array')
     }
     return 'ok'
   },
-  setTransferred16Array: (arr) => {
+  setTransferred16Array: (arr: any) => {
     if (!(arr instanceof Uint16Array)) {
       throw new Error('Expected Uint16Array')
     }
     return 'ok'
   },
-  setTransferred32Array: (arr) => {
+  setTransferred32Array: (arr: any) => {
     if (!(arr instanceof Uint32Array)) {
       throw new Error('Expected Uint32Array')
     }
     return 'ok'
   },
   tryToUseArray: () => uint8Array.map(v => v + 1),
-  manipulateAndTransfer: (arr) => {
+  manipulateAndTransfer: (arr: Uint8Array) => {
     const manipulated = arr.map(v => v + 1)
     return withTransfer(manipulated, [manipulated])
   },
-  transferNested: ({ value }) => {
+  transferNested: ({ value }: { value: Uint8Array }) => {
     const manipulated = value.map(v => v + 1)
     return withTransfer({
       value: manipulated

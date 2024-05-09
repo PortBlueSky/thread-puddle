@@ -1,5 +1,7 @@
 node_modules
 lib
+coverage
+examples
 
 # for testing purposes
 src/__tests__/workers/invalid-ts.ts

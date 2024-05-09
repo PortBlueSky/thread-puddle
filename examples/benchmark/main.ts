@@ -1,6 +1,6 @@
 import { createThreadPool } from '../../lib'
 import { CalcWorker } from './puddle-worker'
-import { MessageChannel, MessagePort, Worker, WorkerOptions } from "worker_threads"
+import { Worker } from "worker_threads"
 import path from 'path'
 
 const ITERATIONS = 100000
