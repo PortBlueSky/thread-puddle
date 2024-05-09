@@ -57,8 +57,14 @@ parentPort.once('message', async (msg: InitMessage) => {
         throw new Error(`Worker should export an object, got ${worker}`)
       }
     }
-  } catch ({ message, stack }) {
-    port.postMessage({ action: ThreadMessageAction.STARTUP_ERROR, message, stack })
+  } catch (error: unknown) {
+    if (error instanceof Error) {
+      const { message, stack } = error
+      port.postMessage({ action: ThreadMessageAction.STARTUP_ERROR, message, stack })
+    } else {
+      debug('Unknown error: %s', JSON.stringify(error))
+      port.postMessage({ action: ThreadMessageAction.STARTUP_ERROR, message: 'Unknown error' })
+    }
     return
   }
 
@@ -136,8 +142,9 @@ parentPort.once('message', async (msg: InitMessage) => {
             }
             port.postMessage(resultMsg)
           }
-        } catch ({ message, stack }) {
-          debug(message)
+        } catch (error: unknown) {
+          const { message, stack } = error as Error
+          debug('Thread call error: %s', message)
           const resultMsg: ThreadErrorMessage = {
             action: ThreadMessageAction.REJECT,
             callableId,

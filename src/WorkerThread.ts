@@ -79,7 +79,7 @@ export class WorkerThread extends EventEmitter {
     // TODO: Handle message error. 
     // Rare and possibly fatal as promises may never be resolved.
     // Note: This happens when trying to receive an array buffer that has already been detached.
-    port2.on('messageerror', (err: Error) => {
+    port2.on('messageerror', () => {
       // Consider pool termination and reject all open promises
     })
 
